@@ -1,0 +1,12 @@
+.DS_Store
+node_modules/
+npm-debug.log
+platforms
+plugins
+build-server.js
+build-server.js.map
+www/build-browser.js
+www/build-browser.js.map
+x.js
+_scripts/
+src/conf/config.backup.js
