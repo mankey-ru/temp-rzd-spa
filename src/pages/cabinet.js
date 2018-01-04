@@ -22,6 +22,7 @@ var component = {
 			},
 			slots: [], // сюда помещаются поездки (название слотс взято тупо из апи)
 			LOADING_ORDERS: false,
+			LOADING_VISA_STATUS: false,
 			HUMAN_ERROR: '', // человекопонятный текст глобальной ошибки
 			DMSAREA: g_dmsArea,
 			POLICY_STATUSES: g_policyStatus,
@@ -42,7 +43,13 @@ var component = {
 			/* Предоплаченное питание */
 			foodList: [],
 			foodListSelectedItem: '',
-			bAuthFormVisible: false
+			bAuthFormVisible: false,
+			bRefundDetailsVisible: false,
+
+			/* PIRS-17776 Багаж */
+			luggageDetails: {
+				LOADING_REFUND: false
+			}
 		}
 	},
 	filters: {},
@@ -77,7 +84,7 @@ var component = {
 					vm.bankResult_checkPaymentYandex();
 				}
 				else {
-					vm.bankResult_finalizePayment();
+					vm.bankResult_finalizePayment(!!window.PAGEDATA.params.zero); // Петя передаёт этот параметр для ВТТ и всякого такого
 				}
 			}
 			else {
@@ -93,6 +100,32 @@ var component = {
 		'jqui-datepicker': jquiDatepicker
 	},
 	methods: {
+        getVisaStatus: function(ord, tik) {
+        	this.LOADING_VISA_STATUS = true;
+        	tik.VISA_ERROR = false;
+        	tik.LOADING_VISA_STATUS = true;
+            requestRid('/ticket/services/visa/status/' + ord.journeyId + '/' + ord.N + '/' + tik.n, {err:1}, vm.$data)
+				.always(function() {
+                    tik.LOADING_VISA_STATUS = false;
+                    vm.$data.LOADING_VISA_STATUS = false;
+				})
+				.done(function(result) {
+					tik.VISA_STATUS = result.data;
+				})
+				.fail(function(msg, fullRes) {
+                    tik.VISA_ERROR = msg || 'Произошла ошибка.\n\n';
+					if(fullRes && (fullRes.info || fullRes.errInfo)) {
+                        tik.VISA_ERROR += ' \n\nПодробности:\n  ' + (fullRes.info || fullRes.errInfo);
+					}
+					if(fullRes && fullRes.timestamp) {
+                        tik.VISA_ERROR += ' \n\nДата ошибки:\n  ' + fullRes.timestamp;
+					}
+				});
+
+        },
+		showRefundDetails: function() {
+			this.bRefundDetailsVisible = !this.bRefundDetailsVisible;
+		},
 		getOrders: getOrders,
 		// Кнопка "Перейти в Мои Заказы" на странице возврата из банка
 		gotoCabinet: function() {
@@ -146,7 +179,7 @@ var component = {
 			ord.LOADING_STATUSES = true;
 			ord.LOADER = true;
 			ord.HUMAN_ERROR = null;
-			var url = '?layer_id=5417';
+			var url = PAGEDATA.LayerLinks.statusRequest; // слой 5417
 			var params = {
 				ORDER_ID: ord.N
 			}
@@ -234,7 +267,7 @@ var component = {
 				ORDER_ID: ord.N,
 				ticket_id: tik.n
 			}
-			UTIL.ridQuery('?layer_id=5418', params, tik)
+			UTIL.ridQuery(PAGEDATA.LayerLinks.statusChange, params, tik) // слой 5418
 				.done(function(result) {
 					if (result.result === 'OK') {
 						vm.getStatuses(ord);
@@ -259,12 +292,24 @@ var component = {
 				ORDER_ID: ord.N,
 				ticket_id: tik.n
 			}
-			UTIL.ridQuery('?layer_id=5421', params, tik)
+			UTIL.ridQuery(PAGEDATA.LayerLinks.ticketRefund, params, tik) // слой 5421
 				.done(function(result) {
 					tik.HUMAN_ERROR = null;
 					UTIL.log(result);
 					var msgTemplate = window.lang(['Ticket', 'The amount due for return: $summa$']);
+					var a, lug, hasLuggage30 = false; // PIRS-17776
 					if ('lst' in result && 'sum' in result.lst[0]) { // то бишь action==='PREVIEW'
+						// PIRS-17776
+						if (tik.extendedServices) {
+							for (a = 0; a < tik.extendedServices.length; a++) {
+								lug = tik.extendedServices[a];
+								if (lug.typeId == 3 && lug.statusId == 30) {
+									hasLuggage30 = true;
+									break;
+								}
+							}
+						}
+
 						var rfnd = {
 							bMulti: result.lst.length > 1,
 							bDisabledCompanion: tik.disabledTypeId === 1,
@@ -273,6 +318,7 @@ var component = {
 							bDMS_cost: tik.POLICY ? tik.POLICY.cost : null,
 							bINSUR: tik.INSUR ? tik.INSUR.bRefund == 0 : null,
 							bINSUR_cost: tik.INSUR ? tik.INSUR.cost : null,
+							bLuggage: hasLuggage30,   // PIRS-17776
 							ord: ord,
 							list: []
 						};
@@ -282,13 +328,18 @@ var component = {
 						for (var k = 0, lenk = ord.lst.length; k < lenk; k++) {
 							var ticket = ord.lst[k];
 							ordTicketList[ticket.id] = ticket;
+
+							// PIRS-17952 - проверка на тариф Деловой проездной
+							if (ticket.tariff == "Деловой проездной") {
+								rfnd.isDpRefund = true;
+							}
 						}
 						for (var i = 0, len = result.lst.length; i < len; i++) {
 							var refundItem = result.lst[i];
 							var ticket = ordTicketList[refundItem.ticketNum];
 							refundItem = $.extend(ticket, refundItem)
 							refundItem.summa = refundItem.sum; // в лучших традициях нашего АПИ в словарном тексте написано $summa$ а в респонсе - sum.
-							refundItem.text = UTIL.formatStr(msgTemplate, {
+							refundItem.message = UTIL.formatStr(msgTemplate, {
 								summa: refundItem.sum,
 								time: refundItem.time,
 								date: refundItem.date
@@ -314,6 +365,10 @@ var component = {
 					}
 					else { // то бишь action==='REFUND'
 						vm.getStatuses(ord);
+						// PIRS-17776
+						for (a = 0; a < tik.extendedServices.length; a++) {
+							tik.extendedServices[a].statusId = 70;
+						}
 					}
 					if (bForceRefund && tik.INSUR) { // то бишь action==='REFUND'
 						vm.$set(tik.INSUR, 'Refunded', 1); // ставим такой же признак как приходит с сервера PIRS-16888
@@ -453,7 +508,7 @@ var component = {
 					lang: window.PAGEDATA.lang,
 					random: Math.random() * 1e5 | 0
 				}
-				var url = UTIL.formatStr('{origin}/blank/ticket/download/{format}/order/{orderId}/{lang}?_rnd={random}', urlParams);
+				var url = UTIL.formatStr('{origin}/ticket-form/ticket/download/{format}/order/{orderId}/{lang}?_rnd={random}', urlParams);
 				if (tik && tik.n) {
 					// если билет не передан в getBlank_ticket
 					// значит, скачиваем бланк не всего заказа, а одного билета
@@ -596,11 +651,38 @@ var component = {
 			var refundAllowed = window.PAGEDATA.BaseParams.is_insurance_refund === '1'; // PIRS-12830
 			return refundAllowed && this.isTicketActionsAvailable(tik, ord) && this.isInsuranceActive(tik) && tik.INSUR.bRefund === 1;
 		},
+
+
+		// PIRS_17579
+		isChangePrepaidFoodPossible: function(tik){
+			var d = window.PAGEDATA.srvDate,
+				currentTime = d.getTime(),
+				final = tik.foodFinal.split(/[.:\s]+/),
+				foodFinalTime = new Date(final[2],final[1]-1,final[0],final[3],final[4], 0, 0 ).getTime();
+				// window.console.log(foodFinalTime);
+			return  (foodFinalTime > currentTime) ? true : false;
+		},
+		// Виден блок предоплаченного/ДОСС питания
 		prepaidFood_visible: function(tik, ord) {
 			if (ord.left && !ord.foodId) {
 				return false
 			}
 			return tik.food;
+		},
+		// Доступна смена предоплаченного/ДОСС питания (см. changeMeal)
+		changeMeal_visible: function(tik, ord) {
+			// TODO разобраться почему оно только в мобильной версии вызывается и вообще что делает
+			if (tik.food && tik.foodFinal) {
+				var dateTimeNow = new Date(window.PAGEDATA.srvDate),
+					tikTimeFinal = new Date(),
+					d = tik.foodFinal.split(' '),
+					date = d[0].split('.');
+				tikTimeFinal.setTime(Date.parse(date.reverse().join('.') + ' 00:00'));
+				if (tikTimeFinal < dateTimeNow) {
+					return false;
+				}
+			}
+			return true;
 		},
 		// Видимость всего блока дополнительного питания
 		addFood_visible: function(tik) {
@@ -710,6 +792,8 @@ var component = {
 					}
 					self.foodList = responseData;
 					self.foodList.tikFoodName = tik.foodName;
+					self.foodList.tikfoodFinal = tik.foodFinal;
+					self.foodList.tikFoodId = tik.foodId;
 					self.foodList.curSlotId = ordslot.id;
 					self.foodList.curORDER_ID = ord.N;
 					self.foodList.curTicketId = tik.n;
@@ -735,8 +819,8 @@ var component = {
 			var self = this;
 			console.log(this);
 			var val = self.foodListSelectedItem.split('_');
-			var foodName = val[0];
-			var foodId = val[1];
+			var foodName = val[0] && val[1] ? val[0] : self.foodList.tikFoodName;
+			var foodId = val[0] && val[1] ? val[1] : self.foodList.tikFoodId;
 			for (var n in self.slots) {
 				if (self.slots[n].id === self.foodList.curSlotId) {
 					// self.slots[n].lst[0].lst[0].foodName = foodName;
@@ -756,30 +840,118 @@ var component = {
 				}
 			}
 		},
+		// PIRS-17776 - Бланк багажа
+		getLuggageBlank: function(tik, lugItem, format) {
+			var refundParam = lugItem.statusId === 70 ? '&refund=1' : '';
+			if (format === 'pdf') {
+				var url = '/ticket-form/luggage/download/pdf/ticket/' + tik.n + '?luggageTypeId=' + lugItem.luggageTypeId + refundParam;
+				downloadFile(url);
+			}
+			else if (format === 'html') {
+				return '/ticket/secure/'+ window.PAGEDATA.lang + '?layer_id=5984&tik_id=' + tik.id + '&baggage_type_id=' + lugItem.luggageTypeId + refundParam;
+			}
+		},
+		// PIRS-17776 - Сдать багаж
+		refundLuggage: function(ordslot, ord, tik, lug) {
+			var closeDialog = function() {
+				$(this).dialog('close');
+			};
+
+			var self = this;
+			var refund = function(evt) {
+				var dialogElement = this;
+				$(evt.currentTarget).hide();
+				self.luggageDetails.LOADING_REFUND = true;
+				UTIL.ridQuery("/ticket/services/luggage/" + ordslot.id + "/" + ord.N + "/" + tik.n + "/" + lug.id, null, {}, {method:"DELETE", useJson: true})
+					.then(
+						function (response) {
+							//Успешный запрс возврата!
+							console.log('Успешный запрос возврата');
+							self.luggageDetails.LOADING_REFUND = false;
+							lug.statusId = 70;
+							$(dialogElement).dialog('close');
+							var cost = response.data.refundAmount,
+								comission = response.data.commissionAmount;
+							UTIL.dialogMessage('Возвращено: ' + cost + ' руб.<br>' + 'комиссия за возврат: ' + comission + ' руб.');
+						},
+						function (reason) {
+							console.log('Запрос возврата не удался');
+							self.luggageDetails.LOADING_REFUND = false;
+							$(dialogElement).find('.jqui-dialog-message').html(
+								'При возврате багажа произошла ошибка: ' + reason);
+						}
+					);
+			}
+			self.luggageDetails.LOADING_REFUND = true;
+			UTIL.ridQuery("/ticket/services/luggage/" + ordslot.id + "/" + ord.N + "/" + tik.n + "/" + lug.id, null, {}, {method: "POST"})
+				.then(
+					function(response) {
+						self.luggageDetails.LOADING_REFUND = false;
+
+						// текущая дата сервера для проверки возврата
+						var ticDate = response.timestamp.substr(3, 2) + '/' + response.timestamp.substr(0, 2) + '/' + response.timestamp.substr(6, 4) + ' ' + response.timestamp.substr(11);
+						var dateTimeNow = new Date(Date.parse(ticDate)); // Date.parse принимает дату в формате MM.DD.YYYY, чтоб его..
+
+						if ((tik.dateTimeDeparture - dateTimeNow < 60 * 59 * 1000)) {
+							// проверка серверного времени и запрет возврата еды менее чем за час до отправления.
+							// тут показываем сообщение о том, что время вышло
+							//tik.SHOW_REFUND_FOOD_MSG = true;
+							//tik.SHOW_REFUND_FOOD = false;
+							UTIL.dialogMessage('Истекло доступное время на возврат багажа. Багаж будет возвращен, денежные средства за вычетом сбора за возврат можно получить в кассе АО "ФПК" в претензионном порядке.');
+							return;
+						}
+						console.log("response:");
+						console.dir(response);
+						var cost = response.data.refundAmount;
+						var params = {
+							buttons: {}
+						};
+						params.buttons[lang('Make refund')] = refund;
+						params.buttons[lang('Cancel')] = closeDialog;
+						UTIL.dialogMessage('Сумма к возврату за багаж: ' + cost + ' руб.', params);
+					},
+					function(reason) {
+						self.luggageDetails.LOADING_REFUND = false;
+						var buttons = {};
+						buttons[lang('Ok')] = closeDialog;
+						UTIL.dialogMessage('Ошибка при получении информации о возврате: ' + reason);
+					}
+				)
+		},
 		/**
 			Подготовка к превращению всего после банка в одностраничник
 			потом вынесем в компоненты, а пока простыня
 		*/
 		// На шаге возврата из банка проверяется статус заказа в экспрессе и финализируется покупка у нас в системе
 		// для яндекса перед этим действием случается дополнительная проверка статуса finalStep_checkPaymentYandex
+		// TODO сделать кнопку гашения в случае неуспеха (слой 5769, ссылка есть в window.PAGEDATA.LayerLinks.reservationCancel)
 		bankResult_finalizePayment: function(bNoCostCheck) {
 			var vm = this;
-			// на слое подтверждения с нулевой стоимостью помимо ВТТ и Лояльности обрабатывается также и Яндекс
-			var layerId = bNoCostCheck ? 5726 : 5752;
-			// TODO сделать кнопку гашения в случае неуспеха, layerId = 5769
-
 			var params = {
 				orderId: vm.$data.form.saleOrderId
 			};
 
-			//Случай если оплачивались только доп услуги
+			var url;
 			if (vm.$data.form.transactionId && vm.$data.form.type === 'SERVICE') {
-				layerId = 5954;
+				// если оплачивались только доп услуги
+				url = PAGEDATA.LayerLinks.paymentConfirmServices || _temp_getLink(5954);
 				params.type = vm.$data.form.type;
 				params.transactionId = vm.$data.form.transactionId
 			}
+			else if (bNoCostCheck) {
+				// если покупка безденежная (ВТТ, Лояльность) либо Яндекс.Деньги
+				url = PAGEDATA.LayerLinks.paymentConfirmZero || _temp_getLink(5726);
+			}
+			else {
+				// нормальная покупка за деньги
+				url = PAGEDATA.LayerLinks.paymentConfirm || _temp_getLink(5726);
+			}
+			function _temp_getLink(layerId){ // строится вручную в рамках PIRS-17519, после установки Space ссылки будут в метаданных
+				var formatContext = PAGEDATA.bAccessible === true ? '/accessible' : '';
+				return `/ticket/secure/${PAGEDATA.lang}${formatContext}?layer_id=${layerId}`; 
 
-			var url = '?layer_id=' + layerId;
+			}
+
 			vm.LOADING_ORDERS = true; // глобальная крутилка
 			UTIL.ridQuery(url, params, vm.$data)
 				.done(function(result) {
@@ -787,7 +959,7 @@ var component = {
 				})
 				.fail(function(result) {
 					paymentCheckDispatch(result, true);
-				})
+				});
 
 			function paymentCheckDispatch(result, bErrorMode) {
 				var allOk = REQ.result === 'OK' && result.result === 'OK' && !bErrorMode;
@@ -928,9 +1100,11 @@ function getOrders(bNext) {
 						// Ваш возврат по платежной транзакции {{./../../transactionId}} обработан. и т.п.
 						// Сообщение на боевом содержит разметку для мусташа
 						sord.REFUND_MESSAGE = window.IFRMSG._orderRefundMessage
-							.replace('{{./../../transactionId}}', ordslot.transactionId)
+							.replace('{{./../../transactionId}}', sord.transactionId)
 							.replace('{{transferDate}}', sordRefund.transferDate)
-							.replace('{{amount}}', sordRefund.amount);
+							.replace('{{amount}}', sordRefund.amount)
+							.replace('{{cardnum}}', sordRefund.cardnum)
+							.replace('{{arn}}', sordRefund.arn);    // PIRS-17430
 					}
 					sord.LINK_REFUND_REGISTER = '?STRUCTURE_ID=735&layer_id=5963&transaction_id=' + sord.transactionId; // PIRS-16410
 					sord.defShowTime = responseData.defShowTime; // переношу сюда чтобы не срать в корень
@@ -946,7 +1120,8 @@ function getOrders(bNext) {
 						ord.STATUS = null;
 						ord.HIDE = false; // скрываем в списке
 						ord.LOADER = false; // initial
-						ord.LINK_BLANK = '?layer_id=5422&ORDER_ID=' + ord.N;
+						//ord.LINK_BLANK = '?layer_id=5422&ORDER_ID=' + ord.N;
+						ord.LINK_BLANK = '?layer_id=5978&order_id=' + ord.N;
 						ord.LINK_PDF = '/blank/ticket/download/pdf/order/' + ord.N;
 						ord.LINK_AUTORACK = '?STRUCTURE_ID=5235&layer_id=5473&app_order_id=' + ord.N;
 						if (window.PAGEDATA.BaseParams.UFS_HOTELS === '1' && !ord.arrived) {
@@ -962,9 +1137,11 @@ function getOrders(bNext) {
 						routeNames.push({
 							'from': ord.parentStation0 || ord.station0,
 							'to': ord.parentStation1 || ord.station1,
-							'dir': ord.dir
+							'dir': ord.dir,
+							'datetime': ord.date0.split('.').reverse().join('') + ord.time0.split(':').join('')
 						});
 
+						var tikStatusCount = 0;
 						for (var j = 0; j < ord.lst.length; j++) {
 							var tik = ord.lst[j]; // это запись в APP_TICKET
 							var ticDate = ord.date0.substr(3, 2) + '/' + ord.date0.substr(0, 2) + '/' + ord.date0.substr(6, 4);
@@ -972,7 +1149,8 @@ function getOrders(bNext) {
 							tik.dateTimeDeparture = new Date(Date.parse(ticDate + ' ' + ord.time0));
 							// нужно для активации/дезактивации кнопки "Сдать билет", за 1 час до выезда должна блокироваться
 
-							tik.LINK_BLANK = '?layer_id=5422&ORDER_ID=' + ord.N + '&ticket_id=' + tik.n;
+							//tik.LINK_BLANK = '?layer_id=5422&ORDER_ID=' + ord.N + '&ticket_id=' + tik.n;
+							tik.LINK_BLANK = '?layer_id=5978&order_id=' + ord.N + '&ticket_id=' + tik.n;
 
 							if (tik.goodsTotalCost) {
 								tik.goodsTotalCost;
@@ -982,13 +1160,15 @@ function getOrders(bNext) {
 							}
 
 							tik.HUMAN_ERROR = '';
+							
 							tik.STATUS = {
 								// первоначальный статус может быть null (если он не окончательный)
 								// а может быть и сразу нормальный (если окончательный, например REFUNDED)
 								NAME: (tik.status ? window.lang(['TicketStatus', tik.status]) : ''),
 								CODE: tik.status
 							};
-							ord.STATUS = !tik.status ? false : true;
+							if (tik.status) tikStatusCount++;
+							// ord.STATUS = !tik.status ? false : true;
 
 							tik.ORDER_ID = ord.N;
 							tik.LOADING_STATUS = false; // initial
@@ -1000,6 +1180,10 @@ function getOrders(bNext) {
 							tik.SHOW_INSURANCES = false;
 							tik.SHOW_REFUND_FOOD = true;
 							tik.SHOW_REFUND_FOOD_MSG = false;
+
+                            tik.LOADING_VISA_STATUS = false; // initial
+							tik.VISA_STATUS = false;
+							tik.VISA_ERROR ='';
 
 							if (tik.extendedServices && tik.extendedServices.length && (tik.dateTimeDeparture - dateTimeNow < 60 * 59 * 1000)) {
 								// запрет возврата еды менее чем за час до отправления.
@@ -1027,10 +1211,12 @@ function getOrders(bNext) {
 								//delete tik.policies[0];
 							}
 						}
+						ord.STATUS = tikStatusCount == ord.lst.length;
 					}
 					var routeName = routeNames[0].from,
 						directional = routeNames[0].dir;
 					if (routeNames.length > 1) {
+						routeNames.sort(function(a,b) { return a.datetime > b.datetime; });
 						for (var r = 1; r < routeNames.length; r++) {
 							if (routeNames[r].dir != directional) {
 								routeName += ' — ' + routeNames[r].from;

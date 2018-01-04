@@ -1,4 +1,6 @@
-import makeApp from './_makeRoot.js'
-import pageMixin from '@pages/cabinet-redesign.vue'
+import makeRoot from './_makeRoot.js'
+import pageComponent from '@pages/cabinet-redesign.vue'
 
-makeApp(pageMixin);
+makeRoot({
+	comps: {pageComponent}
+});

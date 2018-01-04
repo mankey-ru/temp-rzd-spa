@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<AutoResponder LastSave="2017-10-26T13:42:48.9959292+03:00" FiddlerVersion="4.6.20173.38786">
+  <State Enabled="true" Fallthrough="true" UseLatency="false">
+    <ResponseRule Match="REGEX:.*/sale/dist/(.*)--bundle.js" Action="http://127.0.0.1:8090/$1--FAKE_THEME--bundle.js" Enabled="true" />
+    <ResponseRule Match="REGEX:.*/sockjs-node/(.*)" Action="http://localhost:8090/sockjs-node/$1" Enabled="true" />
+  </State>
+</AutoResponder>

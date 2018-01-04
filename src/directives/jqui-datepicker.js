@@ -11,6 +11,9 @@ export default {
 			}
 		})
 		var $inp = $(el);
+		if ($inp.data('multi-months')) {
+			opts.numberOfMonths = [1,3];
+		}
 		$inp.datepicker(opts);
 		/**
 			Пример использования

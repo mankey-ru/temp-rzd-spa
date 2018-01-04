@@ -1,4 +1,8 @@
-import makeApp from './_makeRoot.js'
-import pageMixin from '@pages/cabinet-mobile.vue'
+import makeRoot from './_makeRoot.js'
+import pageComponent from '@pages/cabinet-mobile.vue'
 
-makeApp(pageMixin);
+makeRoot({
+	comps: {
+		pageComponent
+	}
+});

@@ -52,9 +52,7 @@
 					</div>
 				</div>
 
-				<div class="row" v-if="HUMAN_ERROR">
-					<pre class="col-xs-12 pre-message pre-message-common">{{HUMAN_ERROR}}</pre>
-				</div>
+				<pre v-if="HUMAN_ERROR" class="pre-message pre-message-common">{{HUMAN_ERROR}}</pre>
 
 				<h3 class="orders-header" v-if="slots.length && bShowForm">Список заказов</h3>
 
@@ -125,7 +123,7 @@
 											<a class="btn" target="_blank"  v-bind:href="ord.LINK_BLANK">
 												<dict name="Order form"/>
 											</a>
-											<button class="btn"  v-on:click="getBlank_ticket('pdf', ord)" v-on:keyup.enter.space="getBlank_ticket('pdf', ord)" v-bind:disabled="ord.LOADING_STATUSES">PDF</button>
+											<a class="btn" v-bind:href="'/ticket-form/ticket/download/pdf/order/' + ord.N + '/ru'">PDF</a>
 										</div>
 									</div>
 								</div>
@@ -172,9 +170,9 @@
 
 								<pre v-if="ord.HUMAN_ERROR" class="pre-message pre-message-common">{{ord.HUMAN_ERROR}}</pre>
 
-								<div class="order-item-ticket" v-for="tik in ord.lst">
-									<div v-bind:class="{'ticket-refunded': tik.status === 'REFUNDED'}">
-										<div class="row">
+								<div class="order-item-ticket" v-for="tik in ord.lst" v-bind:class="{'ticket-refunded': tik.status === 'REFUNDED'}">
+									<div>
+										<div class="row onrefund-show">
 											<div class="col-xs-7 text-bold">{{tik.name}}</div>
 											<div class="col-xs-5 text-right text-small">(док. {{tik.doc}})</div>
 										</div>
@@ -205,9 +203,21 @@
 										</div>
 										<div class="row">
 											<div class="col-xs-4"><dict name="Ticket/Cost" /></div>
-											<div class="col-xs-8"><span class="text-red">{{tik.cost | FORMAT_SUM}}&#160;руб.</span> ({{tik.tariff}})</div>
+											<div class="col-xs-8">
+												<span class="text-red">
+													<span v-if="tik.tariffId == 200" class="text-capitalize">   <!-- PIRS-17511 билет куплен по Деловому проездному PIRS-18023 -->
+														<dict name="prepaid"/>
+													</span>
+													<span v-else="">
+														{{tik.cost | FORMAT_SUM}}&#160;<dict name="RUB"/>&#160;
+													</span>
+												</span>
+												<span>
+													{{tik.tariff}}
+												</span>
+											</div>
 										</div>
-										<div class="row">
+										<div class="row onrefund-show">
 											<div class="col-xs-4"><dict name="Status" /></div>
 											<div class="col-xs-8">
 												<div v-if="true">
@@ -215,7 +225,21 @@
 													<div v-else="">
 														<b>{{tik.STATUS.NAME}}</b> &#160; 
 														<!-- <a v-on:click="getStatuses(ord)" class="link-dotted">Обновить</a> -->
+														<!-- PIRS-17431 -->
+														<a href="#"
+														   v-if="ordslot.REFUND_MESSAGE"
+														   v-on:click.prevent="showRefundDetails">
+															<dict name="Refund_Details"/>
+														</a>
 													</div>
+												</div>
+											</div>
+											<!-- PIRS-17430 - Детали возврата -->
+											<div class="col-xs-12" v-if="bRefundDetailsVisible">
+												<div class="pass-orderList-refund-msg__cont alert alert-warning"
+												     v-if="ordslot.REFUND_MESSAGE">
+													<!-- сообщение Ваш возврат по платежной транзакции XXXX обработан и т.п., собирается из PSTKT_CABINET_MSG_REFUND_* -->
+													<div class="refund-msg__item" v-html="ordslot.REFUND_MESSAGE"></div>
 												</div>
 											</div>
 										</div>
@@ -226,8 +250,8 @@
 														<a class="btn" target="_blank"  v-bind:href="tik.LINK_BLANK">
 															<dict name="Ticket blank"/>
 														</a>
-														<button class="btn"  v-on:click="getBlank_ticket('pdf', ord, tik)" v-on:keyup.enter.space="getBlank_ticket('pdf', ord, tik)" v-bind:disabled="ord.LOADING_STATUSES">PDF</button>
-														<button class="btn"  v-on:click="getBlank_ticket('png', ord, tik)" v-on:keyup.enter.space="getBlank_ticket('png', ord, tik)" v-bind:disabled="ord.LOADING_STATUSES">PNG</button>
+														<a class="btn" v-bind:href="'/ticket-form/ticket/download/pdf/order/' + ord.N + '/ru?ticketId=' + tik.n">PDF</a>
+														<a class="btn" v-bind:href="'/ticket-form/ticket/download/png/order/' + ord.N + '/ru?ticketId=' + tik.n">PNG</a>
 													</div>
 													<!--PIRS-11575-->
 													<div class="form-group form-group" v-if="tik.STATUS.CODE==='REFUNDED'">
@@ -238,6 +262,129 @@
 												</div>
 											</div>
 										</div>
+
+										<template v-if="prepaidFood_visible(tik, ord) || addFood_visible(tik)">
+											<div class="row form-group">
+												<div v-if="prepaidFood_visible(tik, ord)" class="">
+													<div class="col-xs-9">
+														Предоплаченное питание:<br/>
+														<template v-if="tik.foodId">
+															<b>{{tik.foodName}}</b>
+															&#160;&#160;
+														</template>
+													</div>
+													<template v-if="!isChangePrepaidFoodPossible(tik)">
+														<div class="col-xs-12">
+															<ifrmsg name="CHANGE_PREPAID_FOOD_NOT_POSSIBLE"/>
+															<p>Дата и время окончания услуги выбора питания: <span style="color:#e21a1a">{{tik.foodFinal}}</span></p>
+														</div>
+													</template>
+													<template v-else="">
+														<div class="col-xs-3 text-right" v-if="!ord.left && tik.status != 'REFUNDED' && changeMeal_visible(tik, ord)">
+															<a v-on:click.prevent="changeMeal(ord, tik, ordslot_index, ordslot)" class="btn" style="padding: .6em .9em; line-height: 1;">
+																<i class="glyphicon glyphicon-cog" v-if="!tik.LOADER_FOOD" style="font-size: 1.5em;"></i>
+																<i class="spin" v-if="tik.LOADER_FOOD" style="font-size: 1.5em;"></i>
+																<!--
+																<template v-if="ord.foodId">Сменить</template>
+																<template v-else="">Выбрать</template> предоплаченное питание
+																-->
+															</a>
+														</div>
+													</template>
+												</div>
+											</div>
+										</template>
+
+
+										<!-- дополнительное питание -->
+										<template v-if="(prepaidFood_visible(tik, ord) || addFood_visible(tik))">
+											<div class="col-xs-24">								
+												<!-- Дополнительное питание -->
+												<div v-if="addFood_visible(tik)">
+													<div class="row" v-for="foodOrder in addFood_getArray(tik)">
+														<div class="col-xs-12">Дополнительное питание:</div>
+														<div v-if="foodOrder.cost && foodOrder.isPurchased" class="col-xs-4">Стоимость</div>
+														<div v-if="foodOrder.cost && foodOrder.isPurchased" class="col-xs-8"><span class="text-red">{{foodOrder.cost | FORMAT_SUM}}&#160;руб.</span></div>
+
+														<!-- Питание возвёрнуто -->
+														<div v-if="foodOrder.isRefunded" class="col-xs-12">Оформлен возврат.</div>
+														
+														<!-- Питание куплено -->
+														<template v-else-if="foodOrder.isPurchased" class="col-xs-12">
+															<div class="col-xs-4 clickable">
+																<a class="food-selector-link" v-on:click.prevent="getFoodDetails(ord, tik, foodOrder)">
+																	<template v-for="(selectedFoodItem, index) in foodOrder.foodPattern.split('')">
+																		<template v-if="index">/</template>
+																		<dict name="Breakfast" v-if="selectedFoodItem === 'З'"/>
+																		<dict name="Lunch" v-if="selectedFoodItem === 'О'" />
+																		<dict name="Dinner" v-if="selectedFoodItem === 'У'" />
+																	</template>
+																	&#160;
+																	<i v-if="!(foodDetails.selectedMenuItems && foodDetails.ticketId === tik.n)" class="glyphicon glyphicon-chevron-right"></i>
+																	<i v-if="foodDetails.selectedMenuItems && foodDetails.ticketId === tik.n" class="glyphicon glyphicon-chevron-left"></i>
+																</a>
+															</div>
+															<div class="col-xs-8 clickable">
+																<template v-if="foodDetails.selectedMenuItems && foodDetails.ticketId === tik.n">
+																	<div v-for="selectedFoodItem in foodDetails.selectedMenuItems">
+																		<div class="">
+																			<dict name="Breakfast" v-if="selectedFoodItem === 'З'"/>
+																			<dict name="Lunch" v-if="selectedFoodItem === 'О'" />
+																			<dict name="Dinner" v-if="selectedFoodItem === 'У'" />
+																		</div>
+																		<div class="col-xs-9">
+																			{{selectedFoodItem.variant}}
+																		</div>
+																		<div class="col-xs-3">
+																			{{selectedFoodItem.count}}&#160;шт.
+																		</div>
+																	</div>
+																	<div class="row" v-if="!tik.SHOW_REFUND_FOOD && tik.SHOW_REFUND_FOOD_MSG">
+																		<div class="col-xs-24 alert alert-info">
+																			<ifrmsg name="ADD_FOOD_REFUND_WARNING"/>
+																		</div>
+																	</div>
+																</template>
+																<template v-else="">&#160;</template>
+															</div>
+														</template>
+														<div class="col-xs-12 text-right" >
+															<div class="form-group btn-group">
+																<template v-if="!foodOrder.isFake">
+																	<!-- PDF-бланк -->
+																	<a v-on:click="getFoodBlank(tik, ord, 'pdf', foodOrder)" class="btn">PDF</a>
+																	
+																	<!-- HTML-бланк -->
+																	<a v-bind:href="getFoodBlank(tik, ord, 'html', foodOrder)" class="btn text-red" style="padding: 1em 1.3em;" target="_blank">
+																		<i class="glyphicon glyphicon-print"></i>
+																	</a>
+																</template>
+																<template v-if="tik.SHOW_REFUND_FOOD && foodOrder.isPurchased">
+																	<a
+																		v-on:click.prevent="refundFood(ord, tik, foodOrder)"
+																		v-bind:disabled="foodDetails.LOADING_REFUND"
+																		class="btn">
+																		<!-- Кнопка "Сдать питание" -->
+																		<dict name="Return addtional food"/>
+																	</a>
+																</template>
+																<!-- Купить питание -->
+																<!--
+																<a class="btn"
+																	v-if="foodOrder.isLast && addFood_isBuyPossible(tik)"
+																	v-on:click.prevent="buyAdditionals(ordslot, ord, tik, 'food')">
+																	
+																	<dict name="Buy"/>
+																</a>
+																-->
+															</div>
+														</div>
+														
+													</div>
+												</div>
+											</div>
+										</template><!-- дополнительное питание -->
+
 
 										<div class="row" v-if="tik.INSUR || tik.POLICY">
 											<div class="text-bold clickable" v-on:click.keyup.enter.space="showInsurances(tik)">
@@ -269,9 +416,7 @@
 
 												<div class="clearfix" v-if="tik.POLICY">
 													<div class="col-xs-12">
-														<b><ifrmsg name="POLICY_TITLE" /></b>
-														<xsl:text> </xsl:text>
-														<ifrmsg name="POLICY_COMPANY" />
+														<b><ifrmsg name="POLICY_TITLE" /></b> <ifrmsg name="POLICY_COMPANY" />
 													</div>
 
 													<div class="col-xs-12 text-bold" v-if="tik.POLICY_STATUS.code != 'ISSUED'" v-html="tik.POLICY_STATUS.name"></div>
@@ -379,10 +524,10 @@
 					<div class="clearfix text-center">
 						<div class="btn-group" style="font-size: .9em;">
 							<a v-if="bShowRetryPayment" v-on:click="retryPayment" class="btn btn-md">Попытаться оплатить ещё раз</a>&#160;<i v-if="bShowRetryPayment && LOADING_ORDERS" class="spin spin-xs"></i>
-							<a class="btn btn-md"  :href="LINK('route')" v-on:click.prevent="bankResult_goStart">
-								<dict name="Ticket/start ticket processing first"/>
+							<a class="btn btn-md" :href="LINK('route')" v-on:click.prevent="bankResult_goStart">
+								<dict name="Ticket/start over"/>
 							</a>
-							<a class="btn btn-md" href="LINK('cabinet')"><dict name="Go to My orders"/></a>
+							<a class="btn btn-md" :href="LINK('cabinet')"><dict name="Go to My orders"/></a>
 						</div>
 					</div>
 
@@ -400,6 +545,59 @@
 							</div>
 						</div>
 					</div>
+
+					<!-- PIRS-16436 -->
+					<!-- Шаблон для вывода списка питания. Содержит контейнер для элементов .j-list и кнопку выбора .j-submit -->
+					<div id="j-change-food-popup">
+						<div class="j-mealList food-selector">
+							<h3><dict name="Selecting the type of food"/></h3>
+							<div style="background: #eee; padding: 1em; margin-bottom: 1em">
+								<div>
+									<p>
+										<b>
+											<dict name="Service expiration moment"/>
+										</b>
+									</p>
+									<!-- всю разметку храним в сообщении ифр -->
+									<ifrmsg name="PSTKT_MSG_FOOD_PRELIM"/>
+								</div>
+							</div>
+							<b><dict name="FoodService/Select food type"/></b>
+							<br/>
+							<div class="j-list">
+								<div v-for="(foodItem, idx) in foodList.list" class="j-food-list-item food-selector__item">
+									<!-- Заголовок выводится всегда. Содержит radio-button и название -->
+									<div class="j-header food-selector__item-head">
+										<!-- дада, я знаю что c лейблом так делать плохо -->
+										<label style="display: block">
+											<input type="radio" v-bind:value="foodItem.name+'_'+foodItem.id" v-model="foodListSelectedItem" name="food-type" v-bind:id="foodItem.id" v-bind:checked="foodItem.name == foodList.tikFoodName"></input>
+											{{foodItem.name}}
+											<!--
+											<div class="food-selector__toggler-down" style="float: right">▼</div>
+											<div class="food-selector__toggler-up" style="float: right">▲</div>
+											-->
+										</label>
+									</div>
+									<!-- Описание скрыто для тех элементов, которые не активны -->
+									<div v-if="foodListSelectedItem == foodItem.name+'_'+foodItem.id" class="j-descr food-selector__item-descr">
+										<div class="message-box">
+											<div v-if="foodItem.shortDescr" class="food-selector__item-descr-short">{{foodItem.shortDescr}}</div>
+											<div>
+												<div v-if="foodItem.hasImage" style="float: left; width: 270px">
+													<img style="max-width: 100%; max-width: 250px;">
+														<!--<xsl:attribute name="src">/dbmm/images/8/23715/{{foodItem.id}}</xsl:attribute>-->
+													</img>
+												</div>
+												<div v-if="foodItem.descr" style="float: left; width: 300px">{{foodItem.descr}}</div>
+												<div style="clear:both"></div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
 					<div class="j-refund-popup" v-if="refundMsg">
 						<p v-if="refundMsg.bMulti">
 							<!-- сообщение при попытке возврата билета инвалида мол, билет сопровождающего тоже надо вернуть -->
@@ -415,7 +613,7 @@
 								<div class="col-xs-12 text-bold">{{ritem.name}}</div>
 							</div>
 
-							<div v-html="ritem.text"></div><!-- "Сумма, причитающаяся к возврату..." - берётся из словаря и шаблонизируется в cabinet.js  -->
+							<div v-html="ritem.message"></div><!-- "Сумма, причитающаяся к возврату..." - берётся из словаря и шаблонизируется в cabinet.js  -->
 							<br/>
 						</div>
 						<div class="form-group" v-if="refundMsg.bINSUR">

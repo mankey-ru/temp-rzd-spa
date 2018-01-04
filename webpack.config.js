@@ -16,15 +16,16 @@ const commonChunkName = 'common-chunk-vue';
 const filenameDelimiter = '--';
 const bundleSuffix = filenameDelimiter + 'bundle.js';
 const Hosts = require('./hosts.js');
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 
 module.exports = function(env) {
+	env = env || {};
 
-	var NOLIMIT = env.nolimit === 'YES'; // т.е. девсервер - собираем всё на свете
-	if (NOLIMIT) {
-		welcomeMsg = ' * Running build for ALL STUFF (env.nolimit=YES)';
+	if (env.devserver === true) {
+		welcomeMsg = ' * Running Webpack Dev Server';
 	}
 	else if (env.entrypoint) {
-		welcomeMsg = ' * Running build ONLY for \n * entrypoint = ' + env.entrypoint;
+		welcomeMsg = ' * Running build ONLY for entrypoint = ' + env.entrypoint;
 	}
 	else if (env.page || env.theme) {
 		welcomeMsg = ' * Running build ONLY for \n * page = ' + env.page + ' \n * theme = ' + env.theme;
@@ -39,17 +40,17 @@ module.exports = function(env) {
 		// имя файла - тупо имя энтрипойнта, например cabinet_mobile
 		filenameTemplate = '[name]';
 	}
-	else if (env.theme || NOLIMIT){
+	else if (env.theme || env.devserver) {
 		// имя файла собирается из имени энтрипойнта (чанка) и указанной в вызове темы (это для странных точек входа)
-		filenameTemplate = '[name]' + filenameDelimiter + (env.theme || 'FAKE_THEME'); 
+		filenameTemplate = '[name]' + filenameDelimiter + (env.theme || 'FAKE_THEME');
 	}
 
 	var output = {
-		path: path.resolve(__dirname, './dist/'),
+		path: path.resolve(__dirname, './dist/'), // dist зашито в коде сборщика
 		filename: filenameTemplate + bundleSuffix
 	};
 
-	if (NOLIMIT) {
+	if (env.devserver) {
 		output.path = path.resolve(__dirname, './');
 		output.publicPath = '/'; // иначе например hot-update будет запрашиваться из корня
 	}
@@ -61,9 +62,11 @@ module.exports = function(env) {
 	var entry = {
 		cabinet_mobile: './src/entry-points/cabinet-mobile.js',
 		cabinet_redesign: './src/entry-points/cabinet-redesign.js',
-		cabinet_special: './src/entry-points/cabinet-special.js'
+		cabinet_special: './src/entry-points/cabinet-special.js',
+		passdata_special: './src/entry-points/passdata-special.js',
+		route_special: './src/entry-points/route-special.js',
 	};
-	if (NOLIMIT === false) {
+	if (env.devserver !== true) {
 		entry[commonChunkName] = [
 			'vue',
 			'vuex',
@@ -96,14 +99,14 @@ module.exports = function(env) {
 				}
 			}, {
 				test: /\.js$/,
-				loader: 'babel-loader',
+				loader: 'babel-loader?cacheDirectory=true',
 				exclude: /node_modules/
 			}]
 		},
 		resolve: {
 			alias: {
 				'vue$': 'vue/dist/vue.common.js',
-				'@src': path.resolve(__dirname, 'src/'),
+				'@src': path.resolve(__dirname, 'src/'), 
 				'@pages': path.resolve(__dirname, 'src/pages'),
 				'@store': path.resolve(__dirname, 'src/store'),
 				'@mixins': path.resolve(__dirname, 'src/mixins'),
@@ -117,8 +120,8 @@ module.exports = function(env) {
 			contentBase: './',
 			// https: true,
 			// хост pass2 прописан в конфиге веба пси с Access-Control-Allow-Origin
-			public: Hosts.fake.domain, // чтобы не было Invalid Host header при заходе на pass2.psi.oooinex.ru, ещё есть disableHostCheck: true
-			proxy: [{
+			public: env.fiddler ? Hosts.real.domain : Hosts.fake.domain, // чтобы не было Invalid Host header при заходе на pass2.psi.oooinex.ru, ещё есть disableHostCheck: true
+			proxy: env.fiddler ? [{}] : [{
 				context: ['**', '!/'], // https://github.com/chimurai/http-proxy-middleware/blob/master/recipes/context-matching.md
 				target: {
 					host: Hosts.real.domain,
@@ -175,10 +178,12 @@ module.exports = function(env) {
 	if (process.env.NODE_ENV === 'production') {
 		CONFIG.devtool = '#source-map';
 		CONFIG.plugins = CONFIG.plugins.concat([
+			
 			new webpack.optimize.CommonsChunkPlugin({
 				name: commonChunkName,
 				filename: commonChunkName + '.js'
 			}),
+
 			new webpack.DefinePlugin({
 				'process.env': {
 					NODE_ENV: '"production"'
@@ -187,31 +192,47 @@ module.exports = function(env) {
 				__DEFINED_ENTRYPOINT: JSON.stringify(env.entrypoint), // собирать только шаблоны указанной темы
 				__DEFINED_THEME: JSON.stringify(env.theme), // собирать только шаблоны указанной темы
 				__DEFINED_PAGE: JSON.stringify(env.page), // собирать только шаблоны указанной страницы
-				__DEFINED_NOLIMIT: JSON.stringify(env.nolimit) // собирать всё (вебпак девсервер)
+				__DEFINED_DEVSERVER: JSON.stringify(!!env.devserver) // собирать всё (вебпак девсервер)
 			}),
-			new webpack.optimize.UglifyJsPlugin({
-				sourceMap: true,
-				parallel: true,
-				compress: {
-					warnings: false
-				}
-			}),
+
 			/**
 				This hack is for preventing moment.js from bloating the bundle with its locales
 				alt solution is new webpack.IgnorePlugin(/(locale)/, /node_modules.+(momentjs)/)
 				or just https://github.com/ksloan/moment-mini
 				see also https://github.com/webpack/webpack/issues/3128
 			*/
-			new webpack.ContextReplacementPlugin(/moment[\/\\]locale$/, /ru/),
-			new SshWebpackPlugin({
-				host: Hosts.psiIp,
-				username: 'root',
-				password: 'ghjuhfvvf',
-				zip: false, // https://github.com/unadlib/ssh-webpack-plugin/issues/2
-				from: 'dist',
-				to: '/opt/IBM/HTTPServer/htdocs/pirs/rzd/js/sale/dist'
-			})
+			new webpack.ContextReplacementPlugin(/moment[\/\\]locale$/, /ru/)
 		])
+
+		if (env.nougly !== true) {
+			CONFIG.plugins.push(new webpack.optimize.UglifyJsPlugin({
+				sourceMap: true,
+				parallel: true,
+				compress: {
+					warnings: false
+				},
+				//exclude: [/^common-chunk/]
+			}))
+		}
 	}
+
+	if (env.devserver !== true) {
+		CONFIG.plugins.push(new SshWebpackPlugin({
+			host: Hosts.psiIp,
+			username: 'root',
+			password: 'ghjuhfvvf',
+			zip: false, // https://github.com/unadlib/ssh-webpack-plugin/issues/2
+			from: 'dist',
+			to: '/opt/IBM/HTTPServer/htdocs/pirs/rzd/js/sale/dist'
+		}))
+	}
+
+	if (env.analyze) { // если запустить к примеру "npm run build:cab-r -- --env.analyze"
+		CONFIG.plugins.push(new BundleAnalyzerPlugin({
+			analyzerPort: 8111
+		}))
+	}
+
+
 	return [CONFIG]
 };

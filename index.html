@@ -1,24 +1,92 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<meta charset="utf-8" />
+	<meta charset="utf-8" />		
+	<meta name="viewport" content="width=device-width, initial-scale=1"/>
 	<title>sale-index</title>
 </head>
 <body>
 	<style>
-		.index-wrap {
-			width: 1000px;
-			margin: 6em auto 0;
-			font-family: consolas, monospace;
-			font-size: 1.4em;
-		}
-	</style>
-	<div class="index-wrap">
-		<ul>
-			<li><a href="http://pass2.psi.oooinex.ru:8090/sale/secure/ru?STRUCTURE_ID=735&layer_id=5901">ЛК редизайна</a></li>
-			<li><a href="http://pass2.psi.oooinex.ru:8090/sale/secure/ru/accessible?STRUCTURE_ID=735&layer_id=5901">ЛК слепых</a></li>
-			<li><a href="http://pass2.psi.oooinex.ru:8090/sale/secure/ru/accessible?STRUCTURE_ID=704&layer_id=5975">ЛК мобилки</a></li>
-		</ul>
-	</div>
+	.index-wrap {
+		width: 700px;
+		margin: 2em auto 0;
+		font-family: consolas, monospace;
+		font-size: 1.2em;
+	}
+	.links {
+		font-size: 1.3em;
+		line-height: 1.5em;
+	}
+	@media only screen and (min-device-width : 320px) and (max-device-width : 480px) {}
+</style>
+<div class="index-wrap">
+	<ul class="links">
+		<li><a href="http://pass2.psi.oooinex.ru:8090/sale/secure/ru?STRUCTURE_ID=735&layer_id=5901">ЛК редизайна</a></li>
+		<li><a href="http://pass2.psi.oooinex.ru:8090/sale/secure/ru/accessible?STRUCTURE_ID=735&layer_id=5901">ЛК слепых</a></li>
+		<li><a href="http://pass2.psi.oooinex.ru:8090/sale/secure/ru?STRUCTURE_ID=704&layer_id=5975">ЛК мобилки</a></li>
+		<li><a href="http://pass2.psi.oooinex.ru:8090/sale/secure/ru/accessible?STRUCTURE_ID=735&layer_id=5976">[эксперимент] Пассданные/Бронирование слепых</a></li>
+		<li><a href="http://pass2.psi.oooinex.ru:8090/sale/secure/ru/accessible?STRUCTURE_ID=735&layer_id=5986">[эксперимент] Поезда/вагоны слепых</a></li>
+	</ul>
+
+	<hr />
+
+	<h3>Установка</h3>
+	<ul>
+		<li>требуется Node.js 6.5+</li>
+		<li>в папке web-server\htdocs\pirs\rzd\js\sale\src выполнить <b>npm i</b></li>
+		<li>
+			добавить в хосты <b>127.0.0.1 pass2.psi.oooinex.ru</b>. 
+			<ul>
+				<li>ПКМ на иконке Windows -> Powershell (администратор)</li>					
+				<li>notepad.exe "%windir%\System32\drivers\etc\hosts"</li>
+			</ul>
+		</li>		
+	</ul>
+
+	<h3>Запуск локального сервера</h3>
+	<ul>
+		<li>
+			npm start &nbsp; (это то же что и npm run dev)
+			<ul>
+				<li><b>npm run devw</b> - запуск с авторестартом когда правится конфиг вебпака (требует nodemon)</li>
+				<li><b>npm run devf</b> - запуск сервера совместимый с фиддлером (готовый конфиг в папке sale)</li>
+			</ul>
+		</li>
+		<li>открыть в браузере <b style="color:red">http</b>://pass2.psi.oooinex.ru:8090</li>
+	</ul>	
+
+	<h3>Сборка (с автоматическим подкладыванием на Пси)</h3>
+	Формат команды такой: (build|b):(cab|pass)[-(r|s|m)], где
+	<ul>
+		<li><b>build и b</b> - сборка для продакшена (10 сек) и быстрая сборка без минификации (4 сек)</li>
+		<li><b>cab и pass</b> - краткие названия точек входа которые нужно собрать</li>
+		<li><b>r, s, m</b> - темы, соответственно Редизайн, Слепые и Мобилка. Можно не указывать, тогда соберутся все три версии.</li>
+	</ul>
+	Например, команды продуктивной сборки ЛК выглядят вот так:
+	<ul>
+		<li>npm run build:cab - все версии кабинетов</li>
+		<li>npm run build:cab-r - только кабинет редизайна</li>
+		<li>npm run build:cab-s - только кабинет слепых</li>
+		<li>npm run build:cab-m - только кабинет мобилки</li>
+	</ul>
+
+	<h3>Как добавить свою точку входа</h3>
+	<ul>
+		<li>Создать собственно файл точки входа в src/entry-points</li>
+		<li>Указать его в переменной entry в webpack.config.js</li>
+		<li>Перед первой сборкой добавить его в скрипты сборки в package.json</li>
+	</ul>
+
+	<h3>Разработка на ПТК отличных от Пси</h3>
+	<p>
+		Вообще хосты прописаны в файле - внезапно - hosts.js
+	</p>
+	<p>
+		Для того чтобы при билде автоматом подкладывалось не на 92 сервер, можно просто изменить значение psiIp
+	</p>
+	<p>
+		Но чтобы пользоваться девсервером и получать <b>данные</b> с Chi, придётся править конфиг nginx и добавлять себе в хосты pass2.chi.oooinex.ru. Если ситуация с неработающим Пси будет продолжаться, сделаем и такой функционал.
+	</p>
+</div>
 </body>
 </html>

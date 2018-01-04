@@ -16,7 +16,7 @@ export default {
 		},
 		LINK: function(key) {
 			if (window.PAGEDATA && window.PAGEDATA.LayerLinks && window.PAGEDATA.LayerLinks[key]) {
-				return window.PAGEDATA.LayerLinks;
+				return window.PAGEDATA.LayerLinks[key];
 			}
 			else {
 				console.error('Не найдена ссылка window.PAGEDATA.LayerLinks.' + key);
@@ -25,7 +25,7 @@ export default {
 		}
 	},
 	filters: {
-		DF_FULL: function(val) { // DateFormat_full
+		DF_FULL: function(val) { // TODO запилить какое-то стандартное форматирование дат
 			if (!val) {
 				return ''
 			}
@@ -39,58 +39,65 @@ export default {
 		FORMAT_SUM: UTIL.formatSum
 	},
 	components: {
+		// Ахтунг! Глобальные компоненты имеет смысл делать functional
+		// https://vuejs.org/v2/guide/render-function.html#Functional-Components
+		// Функциональные компоненты - просто функции, они не имеют состояния и не создают хуков и обсерверов
+		// ко всему прочему, они не отображаются в Vue devtools, это тоже плюс в случае словарей и сообщений ИФР
+		// https://vuejs.org/v2/guide/render-function.html#createElement-Arguments
 		'dict': {
+			functional: true,			
 			props: {
 				name: {
 					type: String
 				}
 			},
-			data: function() {
-				return {
-					content: ''
-				}
-			},
-			created: function() {
-				var key = this.$props.name;
+			render: function(createElement, context) {
+				var key = context.props.name;
 				if (key.indexOf('/') !== -1) {
 					key = key.split('/');
 				}
 				var value = window.lang(key);
-				var comment = this.IS_DEV ? `<!--${key}-->` : '';
+				var comment = context.parent.IS_DEV ? `<!--${key}-->` : '';
+				var content = '';
 				if (value) {
-					this.$data.content = comment + value;
+					content = comment + value;
 				}
-				else if (this.IS_DEV) {
-					this.$data.content = `Словарная запись с ключом «${key}» не найдена`;
-					console.error(this.$data.content);
+				else if (context.parent.IS_DEV) {
+					content = `Словарная запись с ключом «${key}» не найдена`;
+					console.error(content);
 				}
-			},
-			template: `<span v-html="content"></span>`
+				return createElement('span', {
+					domProps: {
+						innerHTML: content
+					}
+				});
+			}
 		},
 		'ifrmsg': {
+			functional: true,
 			props: {
 				name: {
 					type: String
 				}
-			},
-			data: function() {
-				return {
-					content: ''
-				}
-			},
-			created: function() {
-				var key = this.$props.name;
+			},			
+			render: function(createElement, context) {				
+				var key = context.props.name;
 				var value = window.IFRMSG[key];
-				var comment = this.IS_DEV ? `<!--${key}-->` : '';
+				var comment = context.parent.IS_DEV ? `<!--${key}-->` : '';
+				var content = '';
 				if (value) {
-					this.$data.content = comment + value;
+					content = comment + value;
 				}
-				else if (this.IS_DEV) {
-					this.$data.content = `Сообщение ИФР «${key}» не найдено в window.IFRMSG`;
-					console.error(this.$data.content);
+				else if (context.parent.IS_DEV) {
+					content = `Сообщение ИФР «${key}» не найдено в window.IFRMSG`;
+					console.error(content);
 				}
-			},
-			template: `<span v-html="content"></span>`
+				return createElement('span', {
+					domProps: {
+						innerHTML: content
+					}
+				});
+			}
 		}
 	},
 	computed: { // отвечает за показ стектрейсов, подробный вывод в консоль, глобальные переменные - ссылки на инстанс VUEI и всякое такое

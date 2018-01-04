@@ -7,7 +7,8 @@
 				return Hosts.fake.siteUrl
 			},
 			realUrl: function(){
-				return window.location.href.replace(Hosts.fake.siteUrl, Hosts.real.siteUrl);
+				var isReal = window.location.hostname === Hosts.real.domain;
+				return isReal ? '' : window.location.href.replace(Hosts.fake.siteUrl, Hosts.real.siteUrl)
 			}
 		}
 	}
@@ -22,7 +23,7 @@
 	<div>
 		<div class="devbar">
 			<a :href="homeUrl"><i class="glyphicon glyphicon-home"></i></a> &nbsp;
-			<a :href="realUrl"><i class="glyphicon glyphicon-new-window" title="Перейти на реальную (непроксированную) страницу. Не забудь сбилдить изменения"></i></a>
+			<a :href="realUrl" v-if="realUrl"><i class="glyphicon glyphicon-new-window" title="Перейти на реальную (непроксированную) страницу. Не забудь сбилдить изменения"></i></a>
 		</div>
 	</div>
 </template>
@@ -33,7 +34,7 @@
 	position: fixed;
 	top: 0;
 	right: 0;
-	background: #fff;	
+	background: rgba(255, 255, 255, .85);
 	padding: 15px 20px;
 	border-radius: 0 0 0 14px;
 	box-shadow: -2px 2px 9px 1px #666;	
@@ -41,5 +42,8 @@
 	.glyphicon {
 		cursor: pointer;
 	}
+}
+.devbar:hover {
+	background: rgba(255, 255, 255, 1);
 }
 </style>

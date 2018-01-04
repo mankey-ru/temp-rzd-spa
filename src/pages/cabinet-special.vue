@@ -7,22 +7,35 @@
 					<div class="row form-group">
 						<div class="col-md-4">
 							<label for="id-name"><dict name="Last name" /></label>
-							<input class="form-control input-lg" id="id-name" v-model="form.name" tabindex="0"/>
 						</div>
 						<div class="col-md-4">
 							<label for="id-number"><dict name="Train number" /></label>
-							<input class="form-control input-lg" id="id-number" v-model="form.number" tabindex="0"/>
 						</div>
 						<div class="col-md-6">
 							<label for="id-date0"><dict name="Departure Date" />&#160;<dict name="predlog/ot" /></label>
+						</div>
+						<div class="col-md-6">
+							<label for="id-date1"><dict name="predlog/do" /></label>
+						</div>
+						<div class="col-md-4 text-right">
+							&#160;
+						</div>
+					</div>
+					<!-- PIRS-17661 выравнивание полей ввода данных для поиска -->
+					<div class="row form-group">
+						<div class="col-md-4">
+							<input class="form-control input-lg" id="id-name" v-model="form.name" tabindex="0"/>
+						</div>
+						<div class="col-md-4">
+							<input class="form-control input-lg" id="id-number" v-model="form.number" tabindex="0"/>
+						</div>
+						<div class="col-md-6">
 							<input class="form-control input-lg" v-jqui-datepicker="form.date0" data-custom-default-value="true" id="id-date0" tabindex="0"/>
 						</div>
 						<div class="col-md-6">
-							<label for="id-date1"><dict name="predlog/do" /></label> 
-							<input class="form-control input-lg" v-jqui-datepicker="form.date1" id="id-date1" tabindex="0"/> 
+							<input class="form-control input-lg" v-jqui-datepicker="form.date1" id="id-date1" tabindex="0"/>
 						</div>
 						<div class="col-md-4 text-right">
-							<label>&#160;</label> 
 							<button type="submit" class="btn btn-block btn-lg"><dict name="Find" /></button>
 						</div>
 					</div>
@@ -59,7 +72,7 @@
 						</div>
 					</h2>
 					<div class="row">
-						<div class="col-md-17">
+						<div class="col-md-14">
 							<div class="row">
 								<div class="col-md-7">
 									<dict name="Train" /> №
@@ -126,18 +139,16 @@
 								</div>
 							</div>
 						</div>							
-						<div class="col-md-7 text-right">
+						<div class="col-md-10 text-right">
 							<!-- кнопки к ЗАКАЗУ -->
 							<div class="btn-group">
 								<a class="btn btn-sm" target="_blank" tabindex="0" v-bind:href="ord.LINK_BLANK">
 									<dict name="Order form" />
 								</a>
-								<button class="btn btn-sm" tabindex="0" 
-									v-on:click="getBlank_ticket('pdf', ord)" 
-									v-on:keyup.enter.space="getBlank_ticket('pdf', ord)" 
-									v-bind:disabled="ord.LOADING_STATUSES">
+								<a class="btn btn-sm" tabindex="0"
+									v-bind:href="'/ticket-form/ticket/download/pdf/order/' + ord.N + '/ru'">
 									PDF
-								</button>
+								</a>
 							</div>
 							<br/><br/>
 							<button class="pass-order-elreg-get btn btn-md" tabindex="0"
@@ -154,16 +165,16 @@
 
 					<template v-if="ord.autoCarrier">
 						<div class="row pass-ord-group">
-							<div class="col-md-17">
+							<div class="col-md-13">
 								<div class="pass-ord-group-head">
 									Перевозка транспортного средства
 								</div>
 								Для данного поезда вы можете оформить заявку на перевозку транспортного средства (автомобиля)
 							</div>
-							<div class="col-md-7 text-right">
+							<div class="col-md-11 text-right">
 								<a v-bind:href="ord.LINK_AUTORACK" target="_blank" class="btn btn-sm">
 									<template v-if="ord.autoOrder">Просмотр заявки на перевозку</template>
-									<template v-else="">Заявка на услугу перевозки автомобиля</template>
+									<template v-else="">Заявка на перевозку автомобиля</template>
 								</a>
 							</div>
 						</div>
@@ -192,9 +203,9 @@
 							v-bind:class="{'pass-orderList-ticket-refunded': tik.status === 'REFUNDED'}">
 							<div class="row">
 								<div class="col-md-24">
-									<div class="pass-ord-ticket-name">{{tik.name | CAPITALIZE}}</div>
+									<div class="pass-ord-ticket-name text-uppercase">{{tik.name | CAPITALIZE}}</div>
 								</div>
-								<div class="col-md-17">
+								<div class="col-md-14">
 									<div class="row">
 										<div class="col-md-7">
 											<dict name="Document number" />
@@ -222,16 +233,23 @@
 										<div class="col-md-7">
 											<dict name="Ticket/Cost" />
 										</div>
-										<div class="col-md-17">	
-											{{tik.cost | FORMAT_SUM}}&#160;руб.
+										<div class="col-md-17">
+											<span v-if="tik.tariffId == 200" class="text-capitalize text-red">   <!-- PIRS-17511 билет куплен по Деловому проездному PIRS-18023 -->
+												<dict name="prepaid"/>
+											</span>
+											<span v-else="">
+												{{tik.cost | FORMAT_SUM}}&#160;<dict name="RUB"/>
+											</span>
 										</div>
 									</div>
 									<div class="row">
 										<div class="col-md-7">
 											<dict name="Tariff" />
 										</div>
-										<div class="col-md-17">	
-											{{tik.tariff}}
+										<div class="col-md-17">
+											<span>
+												{{tik.tariff}}
+											</span>
 										</div>
 									</div>
 									<div class="row">
@@ -241,20 +259,28 @@
 										<div class="col-md-17">		
 											<i v-if="tik.LOADER || ord.LOADER" class="spin"></i><!-- ord.LOADING_STATUSES || tik.LOADING_STATUS -->
 											<div v-else="" class="pass-orderList-status">
-												<b v-if="tik.STATUS.NAME">{{tik.STATUS.NAME}}</b>
+												<span v-if="tik.STATUS.NAME">
+													<b>{{tik.STATUS.NAME}}</b><br/>
+													<!-- PIRS-17429 - ссылка на детали возврата -->
+													<a href="#"
+													   v-if="ordslot.REFUND_MESSAGE"
+													   v-on:click.prevent="showRefundDetails">
+														<dict name="Refund_Details"/>
+													</a>
+												</span>
 												<a v-else="" v-on:click="getStatuses(ord)" class="link-dotted"><!-- Обновить --><dict name="Reset"/></a>
 												<!-- есть ещё признак финального (окончательного) статуса - finalSt -->
 											</div>
 										</div>
 									</div>
 								</div>
-								<div class="col-md-7 text-right"><!--кнопки к билету-->
+								<div class="col-md-10 text-right"><!--кнопки к билету-->
 									<div class="form-group btn-group">
 										<a class="btn btn-sm" target="_blank" tabindex="0" v-bind:href="tik.LINK_BLANK">
 											<dict name="Ticket blank" />
 										</a>
-										<button class="btn btn-sm" tabindex="0" v-on:click="getBlank_ticket('pdf', ord, tik)" v-on:keyup.enter.space="getBlank_ticket('pdf', ord, tik)" v-bind:disabled="ord.LOADING_STATUSES">PDF</button>
-										<button class="btn btn-sm" tabindex="0" v-on:click="getBlank_ticket('png', ord, tik)" v-on:keyup.enter.space="getBlank_ticket('png', ord, tik)" v-bind:disabled="ord.LOADING_STATUSES">PNG</button>
+										<a class="btn btn-sm" tabindex="0" v-bind:href="'/ticket-form/ticket/download/pdf/order/' + ord.N + '/ru?ticketId=' + tik.n">PDF</a>
+										<a class="btn btn-sm" tabindex="0" v-bind:href="'/ticket-form/ticket/download/png/order/' + ord.N + '/ru?ticketId=' + tik.n">PNG</a>
 									</div>
 									<!--PIRS-11575-->
 									<div class="form-group" v-if="tik.STATUS.CODE==='REFUNDED'">
@@ -307,7 +333,8 @@
 
 							<!-- сообщение Ваш возврат по платежной транзакции XXXX обработан и т.п., собирается из PSTKT_CABINET_MSG_REFUND_* -->
 							<template v-if="ordslot.REFUND_MESSAGE">
-								<div class="pass-orderList-refund-msg__cont">
+								<!-- PIRS-17429 - Детали возврата -->
+								<div class="pass-orderList-refund-msg__cont" v-if="bRefundDetailsVisible">
 									<div class="refund-msg__item" v-html="ordslot.REFUND_MESSAGE"></div>
 								</div>
 							</template>
@@ -434,19 +461,28 @@
 											</div>
 										</div>											
 									</div>
-									<div v-if="!ord.left && tik.status != 'REFUNDED'" class="col-md-7 text-right">
-										<a v-on:click.prevent="changeMeal(ord, tik, ordslot_index, ordslot)" class="btn btn-sm">
-											<template v-if="ord.foodId">Сменить</template>
-											<template v-else="">Выбрать</template> тип питания
-										</a>
-									</div>
+									<!--PIRS_17579-->
+									<template v-if="!isChangePrepaidFoodPossible(tik)">
+										<div class="col-md-24">
+											<ifrmsg name="CHANGE_PREPAID_FOOD_NOT_POSSIBLE"/>
+											<p>Дата и время окончания услуги выбора питания: <span style="color:#e21a1a">{{tik.foodFinal}}</span></p>
+										</div>
+									</template>
+									<template v-else="">
+										<div v-if="!ord.left && tik.status != 'REFUNDED'" class="col-md-7 text-right">
+											<a v-on:click.prevent="changeMeal(ord, tik, ordslot_index, ordslot)" class="btn btn-sm">
+												<template v-if="ord.foodId">Сменить</template>
+												<template v-else="">Выбрать</template> тип питания
+											</a>
+										</div>
+									</template>
 								</div>
 							</template>
 
 							<!-- Дополнительное питание -->
 							<template v-if="addFood_visible(tik)">
 								<div  v-for="foodOrder in addFood_getArray(tik)" class="row pass-ord-group">
-									<div class="col-md-17">
+									<div class="col-md-15">
 										<div class="pass-ord-group-head">
 											<ifrmsg name="ADD_FOOD" />
 										</div>
@@ -486,7 +522,7 @@
 										</template>
 									</div>
 
-									<div class="col-md-7 text-right">
+									<div class="col-md-9 text-right">
 
 										<div class="btn-group" v-if="!foodOrder.isFake">
 											<a v-bind:href="getFoodBlank(tik, ord, 'html', foodOrder)" class="btn btn-sm" target="_blank"><dict name="Receipt"/></a>
@@ -504,7 +540,7 @@
 
 											<button :href="LINK('catering-menu-page')" class="btn btn-sm" v-on:click.prevent="addFood_showMenuWindow()">Посмотреть меню</button>
 
-											<button class="btn btn-sm" v-if="addFood_isBuyPossible(tik)" v-on:click.prevent="buyAdditionals(ordslot, ord, tik, 'food')">
+											<button class="btn btn-sm" v-if="foodOrder.isLast && addFood_isBuyPossible(tik)" v-on:click.prevent="buyAdditionals(ordslot, ord, tik, 'food')">
 												<dict name="Buy" /><!-- Купить питание -->
 											</button>
 										</div>
@@ -650,7 +686,7 @@
 									</label>
 								</div>
 								<!-- Описание скрыто для тех элементов, которые не активны -->
-								<div class="j-descr food-selector__item-descr">
+								<div v-if="foodListSelectedItem == foodItem.name+'_'+foodItem.id" class="j-descr food-selector__item-descr" style="display: block;">
 									<div class="message-box">
 										<div v-if="foodItem.shortDescr" class="food-selector__item-descr-short">
 											{{foodItem.shortDescr}}
@@ -694,7 +730,7 @@
 						<a class="btn btn-md"  :href="LINK('route-2012')" v-on:click.prevent="bankResult_goStart">
 							<dict name="Ticket/start ticket processing first"/>
 						</a> &#160;
-						<a class="btn btn-md" v-on:click.prevent="gotoCabinet" href="LINK('cabinet-2012')">
+						<a class="btn btn-md" v-on:click.prevent="gotoCabinet" :href="LINK('cabinet')">
 							<dict name="Go to My orders"/>
 						</a>
 					</div>
