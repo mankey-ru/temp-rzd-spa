@@ -1,59 +1,3 @@
-<style lang="less">
-.stsug-wrap {
-	position: relative;
-	.spin {		
-		position: absolute;
-		top: 5px;
-		right: 10px;
-		font-size: 1.2em;
-	}
-}
-.v-autocomplete-input-group .v-autocomplete-input {
-	font-size: 1.5em;
-	padding: 10px 15px;
-	box-shadow: none;
-	border: 1px solid #157977;
-	width: calc(100% - 32px);
-	outline: none;
-	background-color: #eee;
-}
-.v-autocomplete-input-group.v-autocomplete-selected .v-autocomplete-input {
-	//color: #008000;
-	//background-color: #f2fff2;
-}
-.v-autocomplete-list {
-	position: absolute;
-	width: 100%;
-	text-align: left;
-	border: none;
-	border-top: none;
-	max-height: 400px;
-	overflow-y: auto;
-	border: 1px solid #ccc;
-	box-shadow: 1px 1px 5px #666;
-    border-radius: 0 6px 6px 0;
-    z-index: 3;
-}
-.v-autocomplete-list-item {
-	cursor: pointer;
-	background-color: #fff;
-	padding: 10px;
-}
-.v-autocomplete-list-item:last-child {
-	border-bottom: none;
-}
-.v-autocomplete-list-item:hover, .v-autocomplete-item-active {
-	background-color: #eee;
-}
-.v-autocomplete-list-item abbr {
-	opacity: 0.8;
-	font-size: 0.8em;
-	display: block;
-	font-family: sans-serif;
-}
-
-</style>
-
 <template> 
 	<div class="stsug-wrap">
 		<autocomplete
@@ -76,6 +20,15 @@
 
 	export default {
 		name: 'StationSuggester',
+		props: {
+			storage: {
+				type: String,
+				default: 'RouteSuggesterHistory'
+			},
+			value: {
+				type: Object
+			}
+		},
 		data: function() {
 			return {
 				myOptions: [],
@@ -85,19 +38,8 @@
 					class: 'form-control input-lg'
 				},
 				itemComponent,
-				// поля названия которых начинаются с педали или доллара
-				// не являются реактивными - экономим микросекунды :)
 				cache: {},
 				history: [] // очистка истории: delete localStorage.RouteSuggesterHistory
-			}
-		},
-		props: {
-			storage: {
-				type: String,
-				default: ''
-			},
-			value: {
-				type: Object
 			}
 		},
 		components: {
@@ -347,3 +289,61 @@ var Sugg = new function() {
 	}
 };
 </script> 
+
+
+
+<style lang="less">
+.stsug-wrap {
+	position: relative;
+	.spin {		
+		position: absolute;
+		top: 5px;
+		right: 10px;
+		font-size: 1.2em;
+	}
+}
+.v-autocomplete-input-group .v-autocomplete-input {
+	font-size: 1.5em;
+	padding: 10px 15px;
+	box-shadow: none;
+	border: 1px solid #157977;
+	width: calc(100% - 32px);
+	outline: none;
+	background-color: #eee;
+}
+.v-autocomplete-input-group.v-autocomplete-selected .v-autocomplete-input {
+	//color: #008000;
+	//background-color: #f2fff2;
+}
+.v-autocomplete-list {
+	position: absolute;
+	width: 100%;
+	text-align: left;
+	border: none;
+	border-top: none;
+	max-height: 400px;
+	overflow-y: auto;
+	border: 1px solid #ccc;
+	box-shadow: 1px 1px 5px #666;
+    border-radius: 0 6px 6px 0;
+    z-index: 3;
+}
+.v-autocomplete-list-item {
+	cursor: pointer;
+	background-color: #fff;
+	padding: 10px;
+}
+.v-autocomplete-list-item:last-child {
+	border-bottom: none;
+}
+.v-autocomplete-list-item:hover, .v-autocomplete-item-active {
+	background-color: #eee;
+}
+.v-autocomplete-list-item abbr {
+	opacity: 0.8;
+	font-size: 0.8em;
+	display: block;
+	font-family: sans-serif;
+}
+
+</style>
