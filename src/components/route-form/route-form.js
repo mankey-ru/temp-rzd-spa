@@ -3,7 +3,6 @@ import datepicker from '@comps/jqui-datepicker.vue'
 import slider from 'vue-slider-component'
 import moment from 'moment'
 
-var hashPrefix = '#/?data=';
 var dateFormat = 'DD.MM.YYYY';
 var vm;
 

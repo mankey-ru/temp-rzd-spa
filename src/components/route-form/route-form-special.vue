@@ -1,36 +1,3 @@
-<style lang="less">
-	.rtf-slider {
-		margin-top: .3em;
-		margin-left: 14px;
-		.vue-slider-process {
-			background-color: #000 !important;
-		}
-		.vue-slider-tooltip {
-			border-color: #000 !important;
-			background-color: #000 !important;
-		}
-		.vue-slider-dot {
-			cursor: move !important;
-		}
-	}
-	.rtf-time-td-1 {
-		white-space: nowrap;
-	}
-	.rtf-time-td-2 {
-		width: 100%;
-	}
-</style>
-
-<style scoped>
-	.rtf-err {
-		color: red;
-		height: 1.3em;
-	}
-	.glyphicon-transfer {
-		font-size: 1.2em;
-	}
-</style>
-
 <template>
 	<div>
 		<form v-on:submit.prevent="trySubmit">
@@ -146,5 +113,38 @@
 		</form>
 	</div>
 </template>
+
+<style lang="less">
+	.rtf-slider {
+		margin-top: .3em;
+		margin-left: 14px;
+		.vue-slider-process {
+			background-color: #000 !important;
+		}
+		.vue-slider-tooltip {
+			border-color: #000 !important;
+			background-color: #000 !important;
+		}
+		.vue-slider-dot {
+			cursor: move !important;
+		}
+	}
+	.rtf-time-td-1 {
+		white-space: nowrap;
+	}
+	.rtf-time-td-2 {
+		width: 100%;
+	}
+</style>
+
+<style scoped>
+	.rtf-err {
+		color: red;
+		height: 1.3em;
+	}
+	.glyphicon-transfer {
+		font-size: 1.2em;
+	}
+</style>
 
 <script src="./route-form.js"></script>
