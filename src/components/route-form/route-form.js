@@ -5,6 +5,7 @@ import moment from 'moment'
 
 var hashPrefix = '#/?data=';
 var dateFormat = 'DD.MM.YYYY';
+var vm;
 
 export default {
 	data: function() {
@@ -13,8 +14,8 @@ export default {
 			code0: null,
 			st1: null,
 			code1: null,
-			times0: [0, 24], // => ti0
-			times1: [0, 24], // => ti1
+			ti0: '0-24',
+			ti1: '0-24',
 			dt0: moment(window.PAGEDATA.srvDate).format(dateFormat),
 			dt1: moment(window.PAGEDATA.srvDate).add(1,'days').format(dateFormat),
 			tfl: 0, // 1 - ДС; 2 - ПС; 3 - неважно|оба
@@ -23,6 +24,7 @@ export default {
 			dir: 0, // туда или туда-обратно
 			checkSeats: true, // "только с местами"
 			md: 2, // пересадки
+			saleDepthLinks: [],
 			v: {
 				stationFrom: '',
 				stationTo: '',
@@ -36,46 +38,43 @@ export default {
 	computed: {
 		stationFrom: stationComputed(0),
 		stationTo: stationComputed(1),
+		times0: timesComputed(0),
+		times1: timesComputed(1),
 		minDate1: function(){
 			return this.$data.dt0 // moment(this.$data.dt0, dateFormat);
 		},
-		isValid: function() { // так как полей всего ничего, решил не юзать либу и валидировать руками
-			var d = this.$data;
-			if (!d.v._onceSubmitted) {
-				return false
+		isValid: {
+			cache: false,
+			get: function() { // так как полей всего ничего, решил не юзать либу и валидировать руками
+				var d = this.$data;
+				if (!d.v._onceSubmitted) {
+					return false
+				}
+
+				var err = 0;
+
+				var errSt0 = (!d.st0 || !d.code0);
+				err += errSt0;
+				d.v.stationFrom = errSt0 ? 'Пожалуйста, выберите станцию отправления' : '';
+
+				var errSt1 = (!d.st1 || !d.code1);
+				err += errSt1;
+				d.v.stationTo = errSt1 ? 'Пожалуйста, выберите станцию назначения' : '';
+
+				var errDt0 = !d.dt0 || !dateIsValid(d.dt0);
+				err += errDt0;
+				d.v.dt0 = errDt0 ? 'Пожалуйста, выберите или введите дату отправления в формате ДД.ММ.ГГГГ' : '';
+
+				var errDt1 = !!d.dir && (!d.dt1 || !dateIsValid(d.dt1));
+				err += errDt1;
+				d.v.dt1 = errDt1 ? 'Пожалуйста, выберите или введите дату отправления обратно в формате ДД.ММ.ГГГГ' : '';
+
+				function dateIsValid(dateStr) {
+					return moment(dateStr, dateFormat, true).isValid()
+				}
+
+				return !err;
 			}
-
-			var err = 0;
-
-			var errSt0 = (!d.st0 || !d.code0);
-			err += errSt0;
-			d.v.stationFrom = errSt0 ? 'Пожалуйста, выберите станцию отправления' : '';
-
-			var errSt1 = (!d.st1 || !d.code1);
-			err += errSt1;
-			d.v.stationTo = errSt1 ? 'Пожалуйста, выберите станцию назначения' : '';
-
-			var errDt0 = !d.dt0;
-			err += errDt0;
-			d.v.dt0 = errDt0 ? 'Пожалуйста, выберите дату отправления' : '';
-
-			var errDt1 = !!d.dir && !d.dt1;
-			err += errDt1;
-			d.v.dt1 = errDt1 ? 'Пожалуйста, выберите дату отправления обратно' : '';
-
-			function dateIsValid(dateStr) {
-				return moment(dateStr, dateFormat, true).isValid()
-			}
-
-
-
-		/*	var inst = $.datepicker._getInst(element);
-			var minDate = $.datepicker._determineDate(inst, $.datepicker._get(inst, 'minDate'), null);
-			var maxDate = $.datepicker._determineDate(inst, $.datepicker._get(inst, 'maxDate'), null);	
-			return [_fdate(minDate), _fdate(maxDate)];
-			function _fdate(date){return $.datepicker.formatDate('dd.mm.yy',date)}*/
-
-			return !err;
 		}
 	},
 	methods: {
@@ -107,47 +106,39 @@ export default {
 		},
 		getRequestParams: function() { // получение объекта с параметрами запроса для гейзера
 			var d = this.$data;
-			var r = {};
-			r.st0 = d.st0;
-			r.code0 = d.code0;
-			r.st1 = d.st1;
-			r.code1 = d.code1;
-			r.dt0 = d.dt0;
-			r.ti0 = d.times0.join('-');
+			var paramNames = ['st0', 'code0', 'st1', 'code1', 'dt0', 'ti0', 'tfl', 'dir', 'checkSeats'];
 			if (d.dir) {
-				r.dt1 = d.dt1;
-				r.ti0 = d.times1.join('-');
+				paramNames.push('dt1', 'ti1');
 			}
-			r.dir = d.dir | 0;
-			r.tfl = d.tfl;
-			r.checkSeats = d.checkSeats | 0;
+			var r = window.copyFields({}, this.$data, paramNames);
 			if (r.checkSeats === 0) {
 				r.withoutSeats = 'y'; // неявный и недокументированный параметр, отвечающий за показ ушедших поездов
 			}			
 			return r;
 		},
 		hash2form: function() {
-			// когда (если) будет роутер, параметр можно будет доставать из $route.query
-			var req = window.location.hash.toString().split(hashPrefix);
-			if (req.length === 2) {
-				var hashData;
-				try {
-					hashData = JSON.parse(decodeURIComponent(req[1]));
-				}
-				catch (e) {};
-				if (hashData) {
-					for (var k in hashData) {
-						this.$data[k] = hashData[k];
-					}					
-					this.$data.v._onceSubmitted = true;
-					if (this.isValid) {
-						this.$emit('formready', this.getRequestParams());
+			for (var k in this.$route.query) {
+				if (k in this.$data) {					
+					var val = this.$route.query[k];
+					if ((val | 0).toString() === val) { // чтобы цифры продолжали оставаться цифрами
+						val = val | 0;
 					}
+					this.$data[k] = val;
 				}
-			};
+			}
+			this.$data.v._onceSubmitted = true;
+			if (this.isValid && window.location.hash.indexOf('_PREVENT_FORM_SUBMIT_') === -1) {
+				this.$emit('formready', this.getRequestParams());
+			}
 		},
 		form2hash: function() {
-			window.location.hash = hashPrefix + encodeURIComponent(JSON.stringify(this.getRequestParams()));
+			this.$router.push({
+				name: 'page-route',
+				query: this.getRequestParams()
+			})
+		},
+		applySaleDepth: function(sd){
+			this.$data.dt0 = sd.sellDate;
 		}
 	},
 	components: {
@@ -156,17 +147,33 @@ export default {
 		slider
 	},
 	watch: {
-		times0: timeWatcher,
-		times1: timeWatcher
+		dt0: validationTrigger,
+		dt1: validationTrigger,
+		stationFrom: validationTrigger,
+		stationTo: validationTrigger
 	},
 	mounted: function() {
+		vm = this;
 		this.hash2form();
+		window.SaleDepth.get('/catalogue/sales_depth/').then(function() {
+			vm.$data.saleDepthLinks = window.SaleDepth.getCalendarLinksArray();
+		});
 	}
 }
 
-function timeWatcher(timeArr) {
-	for (var i = 0; i < timeArr.length; i++) {
-		timeArr[i] = timeArr[i] | 0;
+function validationTrigger() {
+	return this.isValid;
+}
+
+function timesComputed(index) {
+	var key = 'ti' + index;
+	return {
+		get: function() {
+			return this.$data[key].split('-');
+		},
+		set: function(v) {
+			this.$data[key] = v.join('-');
+		}
 	}
 }
 
@@ -175,15 +182,19 @@ function stationComputed(index) {
 	var codeName = 'code' + index;
 	return {
 		get: function() {
-			return this[stName] && this[codeName] ? {
+			return this.$data[stName] && this.$data[codeName] ? {
 				label: this[stName],
 				value: this[codeName]
 			} : null;
 		},
 		set: function(v) {
-			if (v) {
+			if (v && v.label && v.value) {
 				this[stName] = v.label;
 				this[codeName] = v.value;
+			}
+			else {
+				this[stName] = '';
+				this[codeName] = '';
 			}
 		}
 	}

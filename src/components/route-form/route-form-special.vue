@@ -9,6 +9,9 @@
 			border-color: #000 !important;
 			background-color: #000 !important;
 		}
+		.vue-slider-dot {
+			cursor: move !important;
+		}
 	}
 	.rtf-time-td-1 {
 		white-space: nowrap;
@@ -19,8 +22,12 @@
 </style>
 
 <style scoped>
-	.v-err {
+	.rtf-err {
 		color: red;
+		height: 1.3em;
+	}
+	.glyphicon-transfer {
+		font-size: 1.2em;
 	}
 </style>
 
@@ -32,8 +39,8 @@
 					<label class="label-xl">
 						<i class="glyphicon glyphicon-asterisk color-red-base"></i> Станция отправления
 					</label>
-					<suggester :value.sync="stationFrom" />
-					<span class="v-err">{{v.stationFrom}}</span>
+					<suggester v-model="stationFrom" storage="StSuggesterFrom" />
+					<div class="rtf-err" role="alert">{{v.stationFrom}}</div>
 				</div> 
 				<div class="col-md-2">
 					<label class="dummy"></label>
@@ -45,8 +52,9 @@
 					<label class="label-xl">
 						<i class="glyphicon glyphicon-asterisk color-red-base"></i> Станция прибытия
 					</label>
-					<suggester :value.sync="stationTo" />
-					<span class="v-err">{{v.stationTo}}</span>
+					<suggester v-model="stationTo" storage="StSuggesterTo" /> 
+					<!-- TODO попробовать :value.sync=st0 и st1 -->
+					<div class="rtf-err" role="alert">{{v.stationTo}}</div>
 				</div>
 			</div>
 			<div class="row form-group">
@@ -74,8 +82,13 @@
 						</tr>
 					</table>
 				</div>
-				<div class="col-md-24">					
-					<span class="v-err">{{v.dt0}}</span>
+				<div class="col-md-24">
+					<div class="rtf-err" role="alert">{{v.dt0}}</div>
+				</div>
+				<div class="col-md-24" v-if="saleDepthLinks.length"> <!-- вообще нужно юзать сообщение SALE_DEPTH_LINK_TMPL, но там мусташевская разметка, так что ради чистоты подхода - хардкод, всё равно никто никогда не будет этого менять -->
+					<template v-for="sd in saleDepthLinks">
+						<a v-on:click="applySaleDepth(sd)" class="link-dotted">За {{sd.days}} <template v-if="sd.endsWithOne">сутки</template><template v-else>суток</template> ({{sd.sellDate}}, {{sd.dayOfWeek}})</a> &nbsp;
+					</template>
 				</div>
 			</div>
 
@@ -100,8 +113,8 @@
 						<tr>
 							<td class="rtf-time-td-1">
 								<div class="form-inline">
-									с <input size="2" class="form-control" v-model="times1[0]" /> 
-									до <input size="2" class="form-control" v-model="times1[1]" />
+									с <input size="1" class="form-control" v-model="times1[0]" /> 
+									до <input size="1" class="form-control" v-model="times1[1]" />
 								</div>
 							</td>
 							<td class="rtf-time-td-2">
@@ -111,7 +124,7 @@
 					</table>
 				</div>
 				<div class="col-md-24">					
-					<span class="v-err">{{v.dt1}}</span>
+					<div class="rtf-err" role="alert">{{v.dt1}}</div>
 				</div>
 			</div>
 			<div class="row">
@@ -130,6 +143,7 @@
 					</button>
 				</div>
 			</div>
+			
 		</form>
 	</div>
 </template>

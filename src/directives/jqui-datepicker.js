@@ -11,9 +11,22 @@ export default {
 			}
 		})
 		var $inp = $(el);
-		if ($inp.data('multi-months')) {
-			opts.numberOfMonths = [1,3];
+
+		// Опция "количество месяцев", на стартовой пасса кажем сразу три
+		if ($inp.attr('months') | 0) {
+			opts.numberOfMonths = [1, $inp.attr('months') | 0];
 		}
+
+		// Опции "минимальная и максимальная даты", на стартовой пасса кажем сразу три
+		var minDate = $inp.attr('mindate'); // attr, потому что нужен стринг, а data превращает "0" в ноль
+		var maxDate = $inp.attr('maxdate');
+		if (minDate) {
+			opts.minDate = minDate;
+		}
+		if (maxDate) {
+			opts.maxDate = maxDate;
+		}
+		opts.hideIfNoPrevNext = true;
 		$inp.datepicker(opts);
 		/**
 			Пример использования

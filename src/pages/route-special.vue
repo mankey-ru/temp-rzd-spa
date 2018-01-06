@@ -1,7 +1,9 @@
 <template>
 	<div>
 		<routeform ref="routeForm" v-on:formsubmit="fetchTrains" v-on:formready="checkCache" />
-		<div v-if="LOADER">Загрузка...</div>
+		<div v-if="LOADER" class="text-center">
+			<i class="spin spin-lg"></i>
+		</div>
 		<template v-if="trdata.tp">
 			<template v-for="trpane in trdata.tp">
 				<div v-for="route in trpane.list" style="border-top: 1px solid;padding: 5px;">

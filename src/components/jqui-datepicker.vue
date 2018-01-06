@@ -3,6 +3,8 @@
 </template>
 
 <script>
+	import moment from 'moment';
+	var dateFormat = 'DD.MM.YYYY';
 	export default {
 		name: 'JqueryUIDatepicker',
 		props: {
@@ -46,10 +48,10 @@
 			},
 			mindate: function(newVal) {
 				$(this.$el).datepicker('option', 'minDate', newVal);
-				var min = newVal.split('.').reverse().join();
-				var cur = this.$props.value.split('.').reverse().join();
-				if (min > cur) {
-					this.$emit('input', newVal);
+				var curDate = moment(this.$props.value, dateFormat, true);
+				var minDate = moment(newVal, dateFormat);
+				if (curDate.isValid() && minDate.isAfter(curDate)) {
+					this.$emit('input', minDate.add(1,'days').format(dateFormat));
 				}
 			}
 		}

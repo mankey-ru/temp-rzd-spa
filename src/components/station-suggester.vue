@@ -26,7 +26,8 @@
 				default: 'RouteSuggesterHistory'
 			},
 			value: {
-				type: Object
+				type: Object,
+				default: null
 			}
 		},
 		data: function() {
@@ -56,8 +57,7 @@
 		methods: {
 			onChange: function(search){
 				if (search.length === 0) {
-					this.$emit('update:value', null);
-					//this.$emit('input', null);
+					this.$emit('input', null);
 					this.$data.myOptions = this.$data.history.reverse();
 				}
 				else {
@@ -68,8 +68,8 @@
 				}
 			},
 			onSelect: function(item) {
-				this.$emit('update:value', item); // см. https://vuejs.org/v2/guide/components.html#sync-Modifier
-				//this.$emit('input', item);
+				//this.$emit('update:value', item); // см. https://vuejs.org/v2/guide/components.html#sync-Modifier
+				this.$emit('input', item);
 				if (this.$props.storage && this.$data.history) {
 					// ищем дубль в выбранных ранее станциях
 					var duplicates = this.$data.history.filter(function(el) {
@@ -299,17 +299,17 @@ var Sugg = new function() {
 		position: absolute;
 		top: 5px;
 		right: 10px;
-		font-size: 1.2em;
+		font-size: 1.5em;
 	}
 }
 .v-autocomplete-input-group .v-autocomplete-input {
-	font-size: 1.5em;
+	/*font-size: 1.5em;
 	padding: 10px 15px;
 	box-shadow: none;
 	border: 1px solid #157977;
 	width: calc(100% - 32px);
 	outline: none;
-	background-color: #eee;
+	background-color: #eee;*/
 }
 .v-autocomplete-input-group.v-autocomplete-selected .v-autocomplete-input {
 	//color: #008000;
@@ -324,9 +324,10 @@ var Sugg = new function() {
 	max-height: 400px;
 	overflow-y: auto;
 	border: 1px solid #ccc;
-	box-shadow: 1px 1px 5px #666;
-    border-radius: 0 6px 6px 0;
-    z-index: 3;
+	box-shadow: 1px 3px 5px 1px #666;
+	font-size: 1.3em;	
+    border-radius: 0 0 6px 6px;
+    z-index: 4;
 }
 .v-autocomplete-list-item {
 	cursor: pointer;
