@@ -18,6 +18,12 @@
 	}
 </style>
 
+<style scoped>
+	.v-err {
+		color: red;
+	}
+</style>
+
 <template>
 	<div>
 		<form v-on:submit.prevent="trySubmit">
@@ -27,6 +33,7 @@
 						<i class="glyphicon glyphicon-asterisk color-red-base"></i> Станция отправления
 					</label>
 					<suggester :value.sync="stationFrom" />
+					<span class="v-err">{{v.stationFrom}}</span>
 				</div> 
 				<div class="col-md-2">
 					<label class="dummy"></label>
@@ -39,12 +46,13 @@
 						<i class="glyphicon glyphicon-asterisk color-red-base"></i> Станция прибытия
 					</label>
 					<suggester :value.sync="stationTo" />
+					<span class="v-err">{{v.stationTo}}</span>
 				</div>
 			</div>
 			<div class="row form-group">
 				<div class="col-md-7">
 					<label class="control-label">Дата отправления</label>
-					<input class="form-control" v-jqui-datepicker="dt0" data-multi-months="true" ref="inp_dt0"/>
+					<datepicker v-model="dt0" :months="3" :mindate="minDate0" :maxdate="maxDate" ref="inp_dt0" />
 				</div>
 				<div class="col-md-4">
 					<label for="" class="dummy"></label>
@@ -66,6 +74,9 @@
 						</tr>
 					</table>
 				</div>
+				<div class="col-md-24">					
+					<span class="v-err">{{v.dt0}}</span>
+				</div>
 			</div>
 
 			<div class="row form-group">
@@ -77,7 +88,7 @@
 			<div class="row form-group" v-if="dir">
 				<div class="col-md-7">
 					<label class="control-label">Дата отправления обратно</label>
-					<input class="form-control" v-jqui-datepicker="dt0" data-multi-months="true" ref="inp_dt1"/>
+					<datepicker v-model="dt1" :months="3" :mindate="minDate1" :maxdate="maxDate" ref="inp_dt1" />
 				</div>
 				<div class="col-md-4">
 					<label for="" class="dummy"></label>
@@ -98,6 +109,9 @@
 							</td>
 						</tr>
 					</table>
+				</div>
+				<div class="col-md-24">					
+					<span class="v-err">{{v.dt1}}</span>
 				</div>
 			</div>
 			<div class="row">

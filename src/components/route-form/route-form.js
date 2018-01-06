@@ -1,24 +1,23 @@
 import suggester from '@comps/station-suggester.vue'
-import jquiDatepicker from '@directives/jqui-datepicker.js'
+import datepicker from '@comps/jqui-datepicker.vue'
 import slider from 'vue-slider-component'
 import moment from 'moment'
 
 var hashPrefix = '#/?data=';
+var dateFormat = 'DD.MM.YYYY';
 
 export default {
 	data: function() {
 		return {
-			//stationFrom: null, // => 
 			st0: null,
 			code0: null,
 			st1: null,
 			code1: null,
-			//stationTo: null,  // => st1, code1
 			times0: [0, 24], // => ti0
 			times1: [0, 24], // => ti1
-			dt0: '',
-			dt1: '',
-			tfl: 0, // 1 - ДС, 2 - ПС, 3 - неважно
+			dt0: moment(window.PAGEDATA.srvDate).format(dateFormat),
+			dt1: moment(window.PAGEDATA.srvDate).add(1,'days').format(dateFormat),
+			tfl: 0, // 1 - ДС; 2 - ПС; 3 - неважно|оба
 			tfl_1: true,
 			tfl_2: true,
 			dir: 0, // туда или туда-обратно
@@ -27,36 +26,56 @@ export default {
 			v: {
 				stationFrom: '',
 				stationTo: '',
-
-			}
+				dt0: '',
+				dt1: ''
+			},
+			maxDate: (PAGEDATA.BaseParams.SALE_DATE_MAX | 0) || 60, // жиквери уи принимает и колво дней и даты
+			minDate0: moment(window.PAGEDATA.srvDate).format(dateFormat) // т.е. сегодня. minDate1 - в computed
 		}
 	},
 	computed: {
 		stationFrom: stationComputed(0),
 		stationTo: stationComputed(1),
+		minDate1: function(){
+			return this.$data.dt0 // moment(this.$data.dt0, dateFormat);
+		},
 		isValid: function() { // так как полей всего ничего, решил не юзать либу и валидировать руками
 			var d = this.$data;
-			for (var k in d.v) {
-				d.v[k] = '';
+			if (!d.v._onceSubmitted) {
+				return false
 			}
-			var ok = true;
-			if (!d.st0 || !d.code0) {
-				ok = false;
-				d.v.stationFrom = 'Пожалуйста, выберите станцию отправления';
+
+			var err = 0;
+
+			var errSt0 = (!d.st0 || !d.code0);
+			err += errSt0;
+			d.v.stationFrom = errSt0 ? 'Пожалуйста, выберите станцию отправления' : '';
+
+			var errSt1 = (!d.st1 || !d.code1);
+			err += errSt1;
+			d.v.stationTo = errSt1 ? 'Пожалуйста, выберите станцию назначения' : '';
+
+			var errDt0 = !d.dt0;
+			err += errDt0;
+			d.v.dt0 = errDt0 ? 'Пожалуйста, выберите дату отправления' : '';
+
+			var errDt1 = !!d.dir && !d.dt1;
+			err += errDt1;
+			d.v.dt1 = errDt1 ? 'Пожалуйста, выберите дату отправления обратно' : '';
+
+			function dateIsValid(dateStr) {
+				return moment(dateStr, dateFormat, true).isValid()
 			}
-			if (!d.st1 || !d.code1) {
-				ok = false;
-				d.v.stationTo = 'Пожалуйста, выберите станцию назначения';
-			}
-			if (!d.dt0) {
-				ok = false;
-				d.v.dt0 = 'Пожалуйста, выберите дату отправления';
-			}
-			if (d.dir && !d.dt1) {
-				ok = false;
-				d.v.dt1 = 'Пожалуйста, выберите дату отправления обратно';
-			}
-			return ok;
+
+
+
+		/*	var inst = $.datepicker._getInst(element);
+			var minDate = $.datepicker._determineDate(inst, $.datepicker._get(inst, 'minDate'), null);
+			var maxDate = $.datepicker._determineDate(inst, $.datepicker._get(inst, 'maxDate'), null);	
+			return [_fdate(minDate), _fdate(maxDate)];
+			function _fdate(date){return $.datepicker.formatDate('dd.mm.yy',date)}*/
+
+			return !err;
 		}
 	},
 	methods: {
@@ -71,6 +90,7 @@ export default {
 			}
 		},
 		trySubmit: function() {
+			this.$data.v._onceSubmitted = true;
 			if (this.isValid) {
 				this.form2hash()
 				this.$emit('formsubmit', this.getRequestParams());
@@ -83,7 +103,7 @@ export default {
 			this.stationTo = from;
 		},
 		triggerDateFocus: function(index) {
-			this.$refs['inp_dt' + index].focus();
+			this.$refs['inp_dt' + index].$el.focus();
 		},
 		getRequestParams: function() { // получение объекта с параметрами запроса для гейзера
 			var d = this.$data;
@@ -101,6 +121,9 @@ export default {
 			r.dir = d.dir | 0;
 			r.tfl = d.tfl;
 			r.checkSeats = d.checkSeats | 0;
+			if (r.checkSeats === 0) {
+				r.withoutSeats = 'y'; // неявный и недокументированный параметр, отвечающий за показ ушедших поездов
+			}			
 			return r;
 		},
 		hash2form: function() {
@@ -115,7 +138,8 @@ export default {
 				if (hashData) {
 					for (var k in hashData) {
 						this.$data[k] = hashData[k];
-					}
+					}					
+					this.$data.v._onceSubmitted = true;
 					if (this.isValid) {
 						this.$emit('formready', this.getRequestParams());
 					}
@@ -128,10 +152,8 @@ export default {
 	},
 	components: {
 		suggester,
+		datepicker,
 		slider
-	},
-	directives: {
-		'jqui-datepicker': jquiDatepicker
 	},
 	watch: {
 		times0: timeWatcher,
