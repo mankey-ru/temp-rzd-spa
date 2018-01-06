@@ -39,7 +39,7 @@
 					<label class="label-xl">
 						<i class="glyphicon glyphicon-asterisk color-red-base"></i> Станция отправления
 					</label>
-					<suggester v-model="stationFrom" storage="StSuggesterFrom" />
+					<suggester :name.sync="st0" :code.sync="code0" storage="StSuggesterFrom" />
 					<div class="rtf-err" role="alert">{{v.stationFrom}}</div>
 				</div> 
 				<div class="col-md-2">
@@ -52,8 +52,7 @@
 					<label class="label-xl">
 						<i class="glyphicon glyphicon-asterisk color-red-base"></i> Станция прибытия
 					</label>
-					<suggester v-model="stationTo" storage="StSuggesterTo" /> 
-					<!-- TODO попробовать :value.sync=st0 и st1 -->
+					<suggester :name.sync="st1" :code.sync="code1" storage="StSuggesterTo" /> 
 					<div class="rtf-err" role="alert">{{v.stationTo}}</div>
 				</div>
 			</div>

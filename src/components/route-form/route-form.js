@@ -10,10 +10,10 @@ var vm;
 export default {
 	data: function() {
 		return {
-			st0: null,
-			code0: null,
-			st1: null,
-			code1: null,
+			st0: '',
+			code0: '',
+			st1: '',
+			code1: '',
 			ti0: '0-24',
 			ti1: '0-24',
 			dt0: moment(window.PAGEDATA.srvDate).format(dateFormat),
@@ -36,8 +36,6 @@ export default {
 		}
 	},
 	computed: {
-		stationFrom: stationComputed(0),
-		stationTo: stationComputed(1),
 		times0: timesComputed(0),
 		times1: timesComputed(1),
 		minDate1: function(){
@@ -96,10 +94,11 @@ export default {
 			}
 		},
 		changeStations: function() {
-			var from = this.stationFrom ? Object.assign({}, this.stationFrom) : null; // хз зачем я клонирую
-			var to = this.stationTo ? Object.assign({}, this.stationTo) : null;
-			this.stationFrom = to;
-			this.stationTo = from;
+			var _data = Object.assign({}, this.$data);
+			this.$data.st0 = _data.st1;
+			this.$data.code0 = _data.code1;
+			this.$data.st1 = _data.st0;
+			this.$data.code1 = _data.code0;
 		},
 		triggerDateFocus: function(index) {
 			this.$refs['inp_dt' + index].$el.focus();
@@ -149,8 +148,8 @@ export default {
 	watch: {
 		dt0: validationTrigger,
 		dt1: validationTrigger,
-		stationFrom: validationTrigger,
-		stationTo: validationTrigger
+		st0: validationTrigger,
+		st1: validationTrigger
 	},
 	mounted: function() {
 		vm = this;
@@ -173,29 +172,6 @@ function timesComputed(index) {
 		},
 		set: function(v) {
 			this.$data[key] = v.join('-');
-		}
-	}
-}
-
-function stationComputed(index) {
-	var stName = 'st' + index;
-	var codeName = 'code' + index;
-	return {
-		get: function() {
-			return this.$data[stName] && this.$data[codeName] ? {
-				label: this[stName],
-				value: this[codeName]
-			} : null;
-		},
-		set: function(v) {
-			if (v && v.label && v.value) {
-				this[stName] = v.label;
-				this[codeName] = v.value;
-			}
-			else {
-				this[stName] = '';
-				this[codeName] = '';
-			}
 		}
 	}
 }

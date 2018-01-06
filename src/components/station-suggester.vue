@@ -1,10 +1,11 @@
 <template> 
 	<div class="stsug-wrap">
 		<autocomplete
+		v-on:blur="onBlur"
 		v-on:change="onChange"
 		v-on:update-items="getOptions" 
-		v-on:item-selected="onSelect"
-		:value="value"
+		v-on:item-selected="onSelect"		
+		:value="autocompleteValue"
 		:items="myOptions"
 		:input-attrs="inputAttrs"
 		:wait="300"
@@ -25,9 +26,19 @@
 				type: String,
 				default: 'RouteSuggesterHistory'
 			},
-			value: {
-				type: Object,
-				default: null
+			code: {
+				default: ''
+			},
+			name: {
+				default: ''
+			}
+		},
+		computed: {
+			autocompleteValue: function(){
+				return this.$props.name && this.$props.code ? {
+					label: this.$props.name,
+					value: this.$props.code,
+				} : null;
 			}
 		},
 		data: function() {
@@ -40,7 +51,8 @@
 				},
 				itemComponent,
 				cache: {},
-				history: [] // очистка истории: delete localStorage.RouteSuggesterHistory
+				history: [],
+				resetValueOnBlur: false
 			}
 		},
 		components: {
@@ -57,10 +69,12 @@
 		methods: {
 			onChange: function(search){
 				if (search.length === 0) {
-					this.$emit('input', null);
+					this.$emit('update:code', '');
+					this.$emit('update:name', '');
 					this.$data.myOptions = this.$data.history.reverse();
 				}
 				else {
+					this.$data.resetValueOnBlur = true;
 					this.$data.myOptions = [];
 				}
 				if (ajaxRequest && ajaxRequest.abort) {
@@ -68,8 +82,10 @@
 				}
 			},
 			onSelect: function(item) {
-				//this.$emit('update:value', item); // см. https://vuejs.org/v2/guide/components.html#sync-Modifier
-				this.$emit('input', item);
+				this.$data.resetValueOnBlur = false;
+				// см. https://vuejs.org/v2/guide/components.html#sync-Modifier
+				this.$emit('update:code', item.value);
+				this.$emit('update:name', item.label);
 				if (this.$props.storage && this.$data.history) {
 					// ищем дубль в выбранных ранее станциях
 					var duplicates = this.$data.history.filter(function(el) {
@@ -83,6 +99,24 @@
 							this.$data.history.shift();
 						}
 						store.local(this.$props.storage, this.$data.history);
+					}
+				}
+			},
+			onBlur: function(){
+				if (this.$data.resetValueOnBlur) { // если поискал и ничего не выбрал
+					var code = this.$props.code;
+					var name = this.$props.name;
+					this.$emit('update:code', '');
+					this.$emit('update:name', '');
+					this.$nextTick(function(){ 
+						// трюк чтобы восстановилось прежнее значение инпута
+						// если не через некстТик, то можно ещё 
+						// сделать сеттер у autocompleteValue, но это не точно
+						this.$emit('update:code', code);
+						this.$emit('update:name', name);
+					})
+					if (ajaxRequest && ajaxRequest.abort) {
+						ajaxRequest.abort();
 					}
 				}
 			},
@@ -116,6 +150,7 @@
 									value: data[i].c
 								})
 							}
+							vm.$data.justGotNewOptions = true;
 							vm.$data.myOptions = opt;
 						})
 						.fail(function() {
